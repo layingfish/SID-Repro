@@ -1,0 +1,14 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+*.egg-info/
+logs/
+*.log
+runs/
+ckpt/
+data/
+saved/
+cache/
+runs/
+reports/
+scripts/

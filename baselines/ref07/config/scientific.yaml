@@ -1,0 +1,73 @@
+dataset: scientific
+seed: 2020
+reproducibility: True
+log_dir: ./logs
+
+map_path: .emb_map.json
+semantic_emb_path: scientific_emb_256.npy
+semantic_hidden_size: 256
+code_num: 256
+code_length: 4
+
+epochs: 400
+lr_rec: 0.005
+lr_id: 0.0001
+weight_decay: 0.05
+
+id_vq_loss: 1
+id_code_loss: 0
+id_kl_loss: 0.0001
+id_dec_cl_loss: 0.0003
+
+rec_vq_loss: 0
+rec_code_loss: 1
+rec_kl_loss: 0.0001
+rec_dec_cl_loss: 0.0003
+
+cycle: 2
+sim: cos
+
+warmup_steps: 8000
+batch_size: 512
+eval_batch_size: 32
+num_workers: 8
+eval_step: 2
+learner: AdamW
+data_path: ./dataset
+lr_scheduler_type: cosine
+gradient_accumulation_steps: 1
+
+max_his_len: 50
+early_stop: 15
+
+metrics: recall@1,recall@5,ndcg@5,recall@10,ndcg@10
+valid_metric: ndcg@10
+
+max_length: 210
+encoder_layers: 6
+decoder_layers: 6
+d_model: 128
+d_ff: 512
+num_heads: 4
+d_kv: 64
+dropout_rate: 0.1
+activation_function: "relu"
+feed_forward_proj: "relu"
+num_beams: 20
+
+alpha: 1
+warm_epoch: 10
+rqvae_path: ./dataset/scientific/256-512-256-128.rqvae.pth
+
+num_emb_list: [256,256,256]
+beta: 0.25
+e_dim: 128
+layers: [512,256]
+vq_type: vq
+dist: l2
+tau: 0.07
+kmeans_init: False
+kmeans_iters: 100
+dropout_prob: 0.0
+bn: False
+loss_type: mse

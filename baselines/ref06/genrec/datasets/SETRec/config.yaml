@@ -1,0 +1,4 @@
+category: beauty
+metadata: sentence
+split: leave_one_out
+setrec_data_root: data/setrec_data

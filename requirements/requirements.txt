@@ -1,0 +1,7 @@
+transformers
+sentencepiece
+sentence-transformers
+accelerate
+datasets
+einops
+gin-config

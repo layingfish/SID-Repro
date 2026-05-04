@@ -1,0 +1,27 @@
+name: recsys26-anon
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - scipy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - pyyaml
+  - tqdm
+  - pytorch
+  - pytorch-cuda=12.1
+  - faiss-gpu
+  - pip:
+      - transformers
+      - sentencepiece
+      - sentence-transformers
+      - accelerate
+      - datasets
+      - einops
+      - gin-config

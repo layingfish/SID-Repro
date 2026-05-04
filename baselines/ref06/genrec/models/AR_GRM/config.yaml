@@ -1,0 +1,76 @@
+model: AR_GRM
+
+n_digit: 4
+codebook_size: 256
+share_embeddings: true
+
+encoder_n_layer: 2
+decoder_n_layer: 4
+n_head: 8
+n_embd: 256
+n_inner: 1024
+dropout: 0.1
+attn_pdrop: 0.1
+resid_pdrop: 0.1
+max_history_len: 50
+
+share_decoder_output_embedding: true
+
+train_mode: autoregressive
+use_causal_mask: true
+teacher_forcing: true
+train_use_kv_cache: false
+
+ar_beam_search:
+  pre_cut_num: [128, 128, 128, 128]
+  beam_search_num: [128, 128, 128, 128]
+  top_k_final: 10
+  self_kv_cache: true
+  cross_kv_cache: true
+  seed: 42
+
+split: leave_one_out
+train_sliding: true
+min_hist_len: 2
+max_hist_len: 50
+
+metadata: sentence
+sent_emb_model: BAAI/bge-large-en-v1.5
+sent_emb_dim: 1024
+sent_emb_pca: 256
+normalize_after_pca: true
+sent_emb_batch_size: 256
+
+sid_quantizer: opq_pq
+rq_kmeans_niters: 20
+rq_kmeans_seed: 2026
+sid_random_seed: 2026
+
+disable_opq: false
+opq_use_gpu: false
+opq_gpu_id: 0
+faiss_omp_num_threads: 32
+
+force_regenerate_opq: false
+
+quantizer: pq
+force_regenerate_codes: false
+
+rq:
+  use_opq: false
+
+train_batch_size: 1024
+eval_batch_size: 32
+lr: 0.003
+weight_decay: 0.0
+warmup_steps: 10000
+epochs: 100
+max_grad_norm: 1.0
+label_smoothing: 0.1
+
+eval_interval: 2
+eval_start_epoch: 20
+patience: 5
+topk: [5, 10]
+metrics: [ndcg, recall]
+val_metric: ndcg@10

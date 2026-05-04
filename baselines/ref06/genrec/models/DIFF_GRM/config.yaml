@@ -1,0 +1,134 @@
+model: DIFF_GRM
+
+n_digit: 4
+codebook_size: 256
+share_embeddings: true
+
+encoder_n_layer: 2
+decoder_n_layer: 2
+n_head: 4
+n_embd: 256
+n_inner: 512
+dropout: 0.1
+embd_pdrop: 0.1
+attn_pdrop: 0.1
+resid_pdrop: 0.1
+
+norm_type: layernorm
+norm_eps: 1e-5
+
+share_decoder_output_embedding: true
+
+beam_search_modes: ["confidence", "random"]
+
+random_beam:
+  beam_act: 64
+  beam_max: 64
+  seed: 42
+
+vectorized_beam_search:
+  top_k_final: 10
+  neg_inf_fp32: -1000000000.0
+  neg_inf_fp16: -65504.0
+  dedup_strategy: simple
+
+  val:     {beam_act: 32,  beam_max: 32}
+  test:    {beam_act: 256, beam_max: 256}
+
+  beam_act: 32
+  beam_max: 32
+
+beam_size: 10
+max_generation_len: 4
+
+masking_strategy: sequential
+
+sequential_steps: auto
+sequential_paths: 1
+
+guided_steps: auto
+guided_conf_metric: msp
+guided_refresh_each_step: false
+guided_select: most
+
+mask_prob_random: false
+mask_prob_random_min: 0.0
+mask_prob_random_max: 1.0
+
+mask_probs: null
+
+mask_prob: 0.5
+augment_factor: 4
+
+max_history_len: 50
+
+split: leave_one_out
+train_sliding: false
+min_hist_len: 2
+max_hist_len: 50
+
+metadata: sentence
+sent_emb_model: sentence-transformers/sentence-t5-base
+sent_emb_dim: 768
+sent_emb_pca: 256
+normalize_after_pca: true
+sent_emb_batch_size: 512
+
+sid_quantizer: opq_pq
+rq_kmeans_niters: 20
+rq_kmeans_seed: 2026
+sid_random_seed: 2026
+
+opq_use_gpu: False
+opq_gpu_id: 0
+faiss_omp_num_threads: 32
+force_regenerate_opq: true
+disable_opq: false
+
+temperature: 0.07
+train_batch_size: 256
+eval_batch_size: 32
+lr: 0.003
+weight_decay: 0.0
+warmup_steps: 10000
+epochs: 200
+max_grad_norm: 1.0
+label_smoothing: 0.1
+
+
+eval_interval: 1
+eval_start_epoch: 20
+patience: 15
+min_delta: 0.0
+topk: [5,10]
+metrics: [ndcg,recall]
+val_metric: weighted_score
+
+mask_schedule:
+  enabled: false
+
+  pipeline:
+    - strategy: sequential
+      sequential_steps: auto
+      sequential_paths: 2
+      epochs: 10
+
+    - strategy: guided
+      guided_select: least
+      guided_steps: auto
+      guided_conf_metric: msp
+      guided_refresh_each_step: false
+      epochs: -1
+
+  eval_start_epoch_override: 5
+  eval_interval_override: 1
+
+ablate_decode:
+  enabled: false
+  per_digit_topk: null
+  beam:
+    val:  { beam_act: 32 }
+    test: { beam_act: 128 }
+
+eval_expand_sid_to_items: false
+eval_expand_dedup: first

@@ -1,0 +1,18 @@
+defaults:
+  - _self_
+
+_target_: lightning.pytorch.trainer.Trainer
+
+default_root_dir: ${paths.output_dir}
+min_steps: 1
+max_steps: !!int 80000
+max_epochs: 10
+accelerator: cpu
+devices: 1
+num_nodes: 1
+precision: bf16-mixed
+log_every_n_steps: 2500
+val_check_interval: 5000
+
+deterministic: False
+accumulate_grad_batches: 1

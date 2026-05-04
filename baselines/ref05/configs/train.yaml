@@ -1,0 +1,30 @@
+
+
+defaults:
+  - _self_
+  - data_loading: null
+  - model: null
+  - callbacks: default
+  - logger: csv
+  - trainer: default
+  - paths: default
+  - extras: default
+  - hydra: default
+  - loss: null
+  - optim: null
+  - eval: null
+
+  - experiment: null
+
+task_name: "train"
+
+id: ${now:%Y-%m-%d}/${now:%H-%M-%S}
+tags: ["dev"]
+
+train: True
+
+test: True
+
+ckpt_path: null
+
+seed: null

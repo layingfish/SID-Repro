@@ -1,0 +1,13 @@
+lr: 0.001
+min_lr: 0.001
+weight_decay: 0.00001
+patience: 2
+es_patience: 2
+
+dropout_rate: 0.2
+num_blocks: 1
+num_heads: 2
+
+embedding_dim: 64
+
+num_neg: 1280
