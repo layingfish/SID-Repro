@@ -1,0 +1,86 @@
+rq: RQ4
+name: sid_geometry
+question: How do different semantic ID designs affect the learning of item semantics?
+
+reference_space:
+  embedding_file: ${DATA_ROOT}/setrec_data/amazon23_vg/amazon23_vg.emb-t5-tdcb.npy
+  embedding_model: sentence-transformers/sentence-t5-base
+  distance: cosine
+
+sid_inputs:
+  TIGER: ${TOKENIZER_ROOT}/I02-TIGER.cached_ids.npy
+  SEATER: ${TOKENIZER_ROOT}/I03-SEATER.cached_ids.npy
+  HowToIndex: ${TOKENIZER_ROOT}/I04-SemID.cached_ids.npy
+  LETTER: ${TOKENIZER_ROOT}/I05-LETTER.cached_ids.npy
+  OPQ: ${TOKENIZER_ROOT}/I06-DiffGRM.cached_ids.npy
+  RQ-Kmeans: ${TOKENIZER_ROOT}/I07-RQKmeans.cached_ids.npy
+
+distance_metrics:
+  native:
+    TIGER: prefix
+    SEATER: prefix
+    HowToIndex: prefix
+    LETTER: prefix
+    OPQ: hamming
+    RQ-Kmeans: prefix
+  drop_last_code_column:
+    TIGER: true
+    SEATER: true
+    HowToIndex: false
+    LETTER: true
+    OPQ: true
+    RQ-Kmeans: true
+
+main_metrics:
+  neighbors_k: 20
+  jaccard_overlap_at_k: true
+  rank_biased_overlap_at_k:
+    enabled: true
+    persistence: 0.9
+
+sampling:
+  pair_samples: 100000
+  triplet_samples: 50000
+  anchor_samples: 128
+  anchor_rank_topm: 200
+  seed: 20260423
+
+case_study:
+  plot_anchor_item_ids: [18089]
+  plot_context_k: 120
+  plot_font_scale: 2.0
+  display_names:
+    I02-TIGER: TIGER
+    I03-SEATER: SEATER
+    I04-SemID: HowToIndex
+    I05-LETTER: LETTER
+    I06-DiffGRM: OPQ
+    I07-RQKmeans: RQ-Kmeans
+
+command_template: >
+  bash scripts/run_rq4.sh
+  --reference_embeddings ${DATA_ROOT}/setrec_data/amazon23_vg/amazon23_vg.emb-t5-tdcb.npy
+  --sid I02-TIGER=${TOKENIZER_ROOT}/I02-TIGER.cached_ids.npy
+  --sid I03-SEATER=${TOKENIZER_ROOT}/I03-SEATER.cached_ids.npy
+  --sid I04-SemID=${TOKENIZER_ROOT}/I04-SemID.cached_ids.npy
+  --sid I05-LETTER=${TOKENIZER_ROOT}/I05-LETTER.cached_ids.npy
+  --sid I06-DiffGRM=${TOKENIZER_ROOT}/I06-DiffGRM.cached_ids.npy
+  --sid I07-RQKmeans=${TOKENIZER_ROOT}/I07-RQKmeans.cached_ids.npy
+  --output_dir ${OUTPUT_DIR}
+  --pair_samples 100000
+  --triplet_samples 50000
+  --anchor_samples 128
+  --neighbors_k 20
+  --plot_anchors 1
+  --plot_anchor_item_ids 18089
+  --plot_context_k 120
+  --plot_method_order I02-TIGER,I03-SEATER,I04-SemID,I05-LETTER,I06-DiffGRM,I07-RQKmeans
+  --plot_display_name I02-TIGER=TIGER
+  --plot_display_name I03-SEATER=SEATER
+  --plot_display_name I04-SemID=HowToIndex
+  --plot_display_name I05-LETTER=LETTER
+  --plot_display_name I06-DiffGRM=OPQ
+  --plot_display_name I07-RQKmeans=RQ-Kmeans
+  --plot_font_scale 2.0
+  --paper_sid_metric native
+  --seed 20260423

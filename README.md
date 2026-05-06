@@ -42,6 +42,12 @@ are organized as follows:
 - `RQ3`: scaling behavior with respect to SID length and decoder backbone size.
 - `RQ4`: item-semantics preservation and geometry analysis.
 
+The submitted hyperparameters are recorded under `configs/`. Use
+`configs/experiment/*.yaml` as the RQ-level protocol index, and use
+`configs/data/`, `configs/tokenizer/`, and `configs/decoder/` for the concrete
+data, SID tokenizer, and decoder settings. The manifest-based decoder launcher
+also uses the GIN files under `baselines/decoder/configs/`.
+
 Pass the required data, tokenizer, checkpoint, and output paths through
 command-line arguments.
 

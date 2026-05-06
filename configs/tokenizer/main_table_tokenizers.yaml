@@ -1,0 +1,153 @@
+protocol: main_table_sid_tokenizers
+reference_item_embedding:
+  default_source: sentence-transformers/sentence-t5-base
+  default_dim: 768
+  file_template: ${DATA_ROOT}/setrec_data/${dataset}/${dataset}.emb-t5-tdcb.npy
+
+common:
+  codebook_size: 256
+  semantic_code_length: 3
+  dedup_suffix: true
+  seed: 42
+
+methods:
+  TIGER:
+    family: rqvae
+    input_embedding: sentence_t5_item_text
+    input_dim: 768
+    hidden_dims: [512, 256, 128]
+    embed_dim: 32
+    n_layers: 3
+    n_cat_feats: 0
+    codebook_size: 256
+    commitment_weight: 0.25
+    codebook_normalize: false
+    sim_vq: false
+    codebook_mode: rotation_trick
+    duplicate_policy: suffix
+
+  T5-SemID:
+    family: howtoindex_semid
+    input_embedding: content_or_category_text
+    representation: content_based
+    backbone: p5_t5
+    uses_cf_embedding: false
+    duplicate_policy: deterministic_leaf_suffix
+
+  RPG:
+    family: opq_pq_parallel_sid
+    metadata: sentence
+    sent_emb_model: text-embedding-3-large
+    sent_emb_dim: 3072
+    sent_emb_pca: 512
+    n_codebook: 32
+    codebook_size: 256
+    opq_use_gpu: false
+    faiss_omp_num_threads: 32
+    n_edges: 50
+    propagation_steps: 3
+    num_beams: 50
+    temperature: 0.07
+
+  LETTER-TIGER:
+    family: letter_rqvae
+    input_embedding: sentence_t5_item_text
+    cf_embedding: sasrec_item_embedding
+    cf_embedding_dim: 64
+    num_emb_list: [256, 256, 256, 256]
+    e_dim: 32
+    layers: [2048, 1024, 512, 256, 128, 64]
+    lr: 0.001
+    weight_decay: 0.0001
+    batch_size: 1024
+    epochs: 20000
+    eval_step: 2000
+    optimizer: AdamW
+    alpha_cf_loss: 0.01
+    beta_diversity_loss: 0.0001
+    kmeans_init: true
+    kmeans_iters: 100
+    sk_epsilons: [0.0, 0.0, 0.0, 0.003]
+    sk_iters: 50
+
+  LETTER-LC-Rec:
+    inherits: LETTER-TIGER
+    decoder_instantiation: lc_rec
+
+  SETRec:
+    family: setrec_t5
+    item_representation: sentence_t5_item_text
+    decoder_backbone: t5
+    uses_cf_embedding: false
+
+  ETEGRec:
+    family: end_to_end_rqvae
+    semantic_embedding: sasrec_item_embedding
+    semantic_embedding_dim: 256
+    code_num: 256
+    code_length: 4
+    max_length: 210
+    num_beams: 20
+    warmup_steps: 8000
+    weight_decay: 0.05
+
+  SEATER:
+    family: tree_structured_sid
+    tree_input_embedding: sasrec_item_embedding
+    embedding_dim: 64
+    tree_builder: balanced_kmeans_tree
+    max_history_length: 50
+
+  EAGER:
+    family: two_stream_behavior_semantic
+    behavior_embedding: din_item_embedding
+    behavior_embedding_dim: 96
+    semantic_embedding: sentence_t5_item_text
+    semantic_embedding_dim: 768
+    kmeans_tree_k:
+      microlens_50k: 128
+      amazon23_vg: 256
+      yelp: 512
+    d_model: 96
+    decoder_layers: [4, 4]
+    use_gct: true
+    use_stt: true
+    merge_method: confidence
+    din_pretrain_steps: 29000
+    main_train_steps: 60000
+
+  DiffGRM:
+    family: opq_pq_diffusion
+    n_digit: 4
+    codebook_size: 256
+    metadata: sentence
+    sent_emb_model: sentence-transformers/sentence-t5-base
+    sent_emb_dim: 768
+    sent_emb_pca: 256
+    normalize_after_pca: true
+    sid_quantizer: opq_pq
+    disable_opq: false
+    rq_kmeans_niters: 20
+    sid_random_seed: 2026
+    train_batch_size: 256
+    eval_batch_size: 32
+    lr: 0.003
+    weight_decay: 0.0
+    warmup_steps: 10000
+    epochs: 200
+    patience: 15
+
+  SASRec:
+    family: sequential_cf
+    item_embedding_source: learned_from_interactions
+    max_history_length: 50
+
+  OneRec:
+    family: rq_kmeans_stage1
+    input_embedding: sentence_t5_item_text
+    codebook_size: 256
+    n_layers: 3
+    assignment: balanced_rq_kmeans
+    max_iter: 50
+    seed: 42
+    stage2_ipa_dpo: not_used

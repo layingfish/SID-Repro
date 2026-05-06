@@ -1,0 +1,57 @@
+rq: RQ1
+name: overall_benchmark
+question: Which SID design performs better under a unified and reproducible generative recommendation framework?
+
+methods:
+  - TIGER
+  - T5-SemID
+  - RPG
+  - LETTER-TIGER
+  - LETTER-LC-Rec
+  - SETRec
+  - ETEGRec
+  - SEATER
+  - EAGER
+  - DiffGRM
+  - SASRec
+  - OneRec
+
+data_config: ../data/setrec_splits.yaml
+tokenizer_config: ../tokenizer/main_table_tokenizers.yaml
+decoder_config: ../decoder/main_table_decoder.yaml
+
+evaluation:
+  modes: [full]
+  top_n: [5, 10]
+  strict_validation: true
+  report_metrics: [Recall@5, Recall@10, NDCG@5, NDCG@10]
+  warm_only_filter: dataset_dependent
+
+command_templates:
+  train_decoder: >
+    bash scripts/run_rq1.sh train-decoder
+    --cached_ids_path ${TOKENIZER_DIR}/cached_ids.npy
+    --tiger_config_path ${TOKENIZER_DIR}/tiger_config.json
+    --gin_config baselines/decoder/configs/decoder_setrec_yelp_t5small_v2_lr3e4_paper.gin
+    --vg_main_table_t5small_align
+  export_decoder: >
+    bash scripts/run_rq1.sh export-decoder
+    --cached_ids_path ${TOKENIZER_DIR}/cached_ids.npy
+    --tiger_config_path ${TOKENIZER_DIR}/tiger_config.json
+    --decoder_ckpt ${RUN_DIR}/checkpoint_4999.pt
+    --dataset_folder ${DATA_ROOT}/decoder
+    --domain amazon23_vg_tiger_strict
+    --hf_model_path ${MODEL_ROOT}/t5-small
+    --beam_size 64
+    --num_return_sequences 64
+    --topk_items 20
+    --batch_size 16
+    --force_num_user_tokens 0
+  evaluate: >
+    bash scripts/run_rq1.sh evaluate
+    --pred ${RUN_DIR}/pred_topk.jsonl
+    --dataset amazon23_vg
+    --mode full
+    --data_dir ${DATA_ROOT}/setrec_data
+    --top_n 5,10
+    --output ${RUN_DIR}/metrics_full.json

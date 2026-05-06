@@ -1,0 +1,63 @@
+rq: RQ3
+name: sid_length_and_backbone_scaling
+question: What are the scaling behaviors of generative recommendation based on different SIDs?
+
+datasets:
+  primary: amazon23_vg
+  auxiliary:
+    - microlens_50k
+    - microlens_100k_train_50k_eval
+
+sid_length_scaling:
+  tokenizer_config: ../tokenizer/length_scaling_tokenizers.yaml
+  methods: [RQ-VAE, RQ-Kmeans, OPQ]
+  lengths: [2, 3, 4, 6, 8, 12, 16]
+  decoder_model: t5-small
+  decoder_recipe: unified_tiger_no_uid_decoder
+  eval_mode: full
+  top_n: [5, 10]
+
+backbone_scaling:
+  decoder_config: ../decoder/backbone_scaling.yaml
+  model_sizes: [t5-small, t5-base, t5-large]
+  iterations: 5000
+  eval_mode: full
+  top_n: [5, 10]
+
+inference_only_diagnostics:
+  token_usage:
+    metrics: [entropy, effective_usage_rate, gini]
+    report_all_layers: true
+  prefix_information_gain:
+    methods: [RQ-VAE, RQ-Kmeans, OPQ]
+    top_n: [5, 10]
+    max_users: 0
+  mask_layer_drop:
+    methods: [RQ-VAE, RQ-Kmeans, OPQ]
+    top_n: [5, 10]
+    max_users: 0
+
+command_templates:
+  length_diagnostics: >
+    bash scripts/run_rq3.sh length-diagnostics
+    --study_root ${STUDY_ROOT}
+    --data_dir ${DATA_ROOT}/setrec_data
+    --dataset amazon23_vg
+    --mode full
+    --methods rqvae,rqkmeans,opq
+    --lengths 2,3,4,6,8,12,16
+    --top_n 5,10
+    --output_dir ${OUTPUT_DIR}
+  capacity_diagnostics: >
+    bash scripts/run_rq3.sh capacity-diagnostics
+    --study_root ${STUDY_ROOT}
+    --output_dir ${OUTPUT_DIR}
+    --methods rqvae,rqkmeans,opq
+    --lengths 2,3,4,6,8,12,16
+    --data_dir ${DATA_ROOT}/setrec_data
+    --eval_dataset amazon23_vg
+    --dataset_folder ${DATA_ROOT}/decoder
+    --export_domain amazon23_vg_tiger_strict
+    --hf_model_path ${MODEL_ROOT}/t5-small
+    --top_ks 5,10
+    --batch_size 32

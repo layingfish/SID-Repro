@@ -1,0 +1,32 @@
+protocol: decoder_backbone_scaling
+dataset: amazon23_vg
+sid_families: [TIGER, SEATER, HowToIndex, LETTER, OPQ, RQ-Kmeans]
+training_recipe: unified_tiger_no_uid_decoder
+
+model_sizes:
+  t5-small:
+    hf_model_path: ${MODEL_ROOT}/t5-small
+    batch_size: 64
+    gradient_accumulate_every: 4
+  t5-base:
+    hf_model_path: ${MODEL_ROOT}/t5-base
+    batch_size: 32
+    gradient_accumulate_every: 8
+  t5-large:
+    hf_model_path: ${MODEL_ROOT}/t5-large
+    batch_size: 16
+    gradient_accumulate_every: 16
+
+common:
+  iterations: 5000
+  save_model_every: 5000
+  learning_rate: 0.0003
+  weight_decay: 0.035
+  num_user_tokens: 0
+  dataset_split: amazon23_vg_tiger_strict
+  force_dataset_process: false
+  export_beam_size: 64
+  export_num_return_sequences: 64
+  export_topk_items: 20
+  eval_mode: full
+  eval_top_n: [5, 10]

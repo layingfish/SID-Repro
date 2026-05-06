@@ -1,0 +1,70 @@
+rq: RQ2
+name: codebook_utilization
+question: Which SID design has the best codebook utilization and does that lead to better recommendation performance?
+
+inputs:
+  cached_ids: ${TOKENIZER_ROOT}/${method}/cached_ids.npy
+  index_json: ${TOKENIZER_ROOT}/${method}/index.json
+
+metrics:
+  per_layer:
+    - used_tokens
+    - dead_tokens
+    - usage_rate
+    - entropy
+    - normalized_entropy
+    - effective_tokens
+    - effective_usage_rate
+    - gini
+    - top1_mass
+    - top5_mass
+  collision:
+    - unique_full_codes
+    - collision_rate
+    - max_collision_group
+    - singleton_ratio
+
+method_metadata:
+  TIGER:
+    method_family: RQ-VAE
+    paper_variant: TIGER
+    implementation_variant: official_rqvae
+    embedding_source: sentence-t5-base
+    embedding_dim: 768
+    balanced_assignment: false
+    dedup_suffix: true
+  LETTER:
+    method_family: LETTER
+    paper_variant: LETTER
+    implementation_variant: cf_loss_diversity
+    embedding_source: sentence-t5-base + SASRec-CF
+    embedding_dim: 768
+    balanced_assignment: true
+    dedup_suffix: true
+  RQ-Kmeans:
+    method_family: RQ-Kmeans
+    paper_variant: OneRec
+    implementation_variant: balanced_residual_kmeans
+    embedding_source: sentence-t5-base
+    embedding_dim: 768
+    balanced_assignment: true
+    dedup_suffix: true
+  OPQ:
+    method_family: OPQ
+    paper_variant: RPG_or_DiffGRM
+    implementation_variant: faiss_opq_pq
+    embedding_source: sentence-t5-base
+    embedding_dim: 768
+    balanced_assignment: false
+    dedup_suffix: true
+
+command_template: >
+  bash scripts/run_rq2.sh
+  --input ${TOKENIZER_FILE}
+  --output_dir ${OUTPUT_DIR}
+  --method_family ${METHOD_FAMILY}
+  --paper_variant ${PAPER_VARIANT}
+  --implementation_variant ${IMPLEMENTATION_VARIANT}
+  --embedding_source ${EMBEDDING_SOURCE}
+  --embedding_dim ${EMBEDDING_DIM}
+  --codebook_sizes 256,256,256

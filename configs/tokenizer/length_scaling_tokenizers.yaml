@@ -1,0 +1,35 @@
+protocol: sid_length_scaling
+dataset: amazon23_vg
+embedding_source: sentence-transformers/sentence-t5-base
+embedding_dim: 768
+lengths: [2, 3, 4, 6, 8, 12, 16]
+codebook_size: 256
+duplicate_policy: suffix
+seed: 42
+
+methods:
+  RQ-VAE:
+    family: rqvae
+    input_dim: 768
+    hidden_dims: [512, 256, 128]
+    embed_dim: 32
+    commitment_weight: 0.25
+    codebook_normalize: false
+    sim_vq: false
+    n_cat_feats: 0
+  RQ-Kmeans:
+    family: balanced_residual_kmeans
+    codebook_width: 256
+    max_iter: 50
+    assignment: balanced
+    search_topk: 32
+    normalize_residuals: true
+  OPQ:
+    family: faiss_opq_pq
+    codebook_size: 256
+    n_codebook_bits: 8
+    index_factory_template: OPQ{length},IVF1,PQ{length}x8
+    metric: inner_product
+    sent_emb_pca: 256
+    opq_use_gpu: false
+    faiss_omp_num_threads: 32

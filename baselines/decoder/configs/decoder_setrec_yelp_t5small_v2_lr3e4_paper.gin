@@ -1,0 +1,8 @@
+include "configs/decoder_setrec_yelp_t5small_paper.gin"
+
+train.pretrained_rqvae_path=None
+train.save_dir_root="runs/tiger_yelp_v2/decoder_t5small_lr3e4/"
+train.force_dataset_process=False
+
+train.learning_rate=0.0003
+train.weight_decay=0.035

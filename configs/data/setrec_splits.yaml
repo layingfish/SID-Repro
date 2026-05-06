@@ -1,0 +1,56 @@
+protocol: setrec_global_time_split
+description: >
+  Unified data preparation used by the submitted experiments. Raw interactions
+  are converted to SETRec-style training/validation/testing dictionaries.
+
+common:
+  k_core: 5
+  split_ratio: 0.17
+  val_multiplier: 1.8
+  min_train_len: 2
+  item_shuffle_seed: 2023
+  user_history_max_len: 50
+  output_files:
+    - training_dict.npy
+    - validation_dict.npy
+    - testing_dict.npy
+    - warm_item.npy
+    - cold_item.npy
+    - combine_tdcb_maps.npy
+
+datasets:
+  microlens_50k:
+    format: microlens
+    interactions: ${DATA_ROOT}/raw/microlens_50k/MicroLens-50k_pairs.csv
+    metadata: ${DATA_ROOT}/raw/microlens_50k/MicroLens-50k_titles.csv
+    output_dir: ${DATA_ROOT}/setrec_data/microlens_50k
+  microlens_100k:
+    format: microlens
+    interactions: ${DATA_ROOT}/raw/microlens_100k/MicroLens-100k_pairs.csv
+    metadata: ${DATA_ROOT}/raw/microlens_100k/MicroLens-100k_titles.csv
+    output_dir: ${DATA_ROOT}/setrec_data/microlens_100k
+  amazon23_vg:
+    format: amazon23
+    interactions: ${DATA_ROOT}/raw/amazon23_vg/Video_Games.jsonl.gz
+    metadata: ${DATA_ROOT}/raw/amazon23_vg/meta_Video_Games.jsonl.gz
+    amazon_user_key: user_id
+    amazon_item_key: parent_asin
+    amazon_item_fallback_key: asin
+    amazon_time_key: timestamp
+    output_dir: ${DATA_ROOT}/setrec_data/amazon23_vg
+  yelp:
+    format: yelp
+    interactions: ${DATA_ROOT}/raw/yelp/extracted/yelp_academic_dataset_review.json
+    metadata: ${DATA_ROOT}/raw/yelp/extracted/yelp_academic_dataset_business.json
+    yelp_user_key: user_id
+    yelp_item_key: business_id
+    yelp_time_key: date
+    output_dir: ${DATA_ROOT}/setrec_data/yelp
+
+text_embeddings:
+  model_name: sentence-transformers/sentence-t5-base
+  embedding_dim: 768
+  batch_size: 64
+  input_file: combine_tdcb_maps.npy
+  output_file_template: ${dataset}.emb-t5-tdcb.npy
+  normalize_embeddings: false
