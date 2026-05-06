@@ -2,6 +2,16 @@ rq: RQ1
 name: overall_benchmark
 question: Which SID design performs better under a unified and reproducible generative recommendation framework?
 
+protocol:
+  training_and_decoding: method_native
+  shared_components:
+    - setrec_style_data_adapters
+    - canonical_zero_based_item_ids
+    - jsonl_prediction_export
+    - unified_evaluator
+  not_used_for_rq1:
+    - ../decoder/main_table_decoder.yaml
+
 methods:
   - TIGER
   - T5-SemID
@@ -16,43 +26,110 @@ methods:
   - SASRec
   - OneRec
 
+datasets:
+  main: [microlens_50k, amazon23_vg, yelp]
+  supported: [beauty, toys, sports, steam, microlens_50k, amazon23_vg, yelp]
+
 data_config: ../data/setrec_splits.yaml
-tokenizer_config: ../tokenizer/main_table_tokenizers.yaml
-decoder_config: ../decoder/main_table_decoder.yaml
+method_config: ../tokenizer/main_table_tokenizers.yaml
 
 evaluation:
   modes: [full]
   top_n: [5, 10]
   strict_validation: true
   report_metrics: [Recall@5, Recall@10, NDCG@5, NDCG@10]
-  warm_only_filter: dataset_dependent
+  warm_only_filter: [microlens_50k, amazon23_vg, yelp]
+  evaluator: pipeline.evaluation.unified_eval
+  prediction_format: jsonl
+  export_helpers: scripts/exports
 
 command_templates:
-  train_decoder: >
-    bash scripts/run_rq1.sh train-decoder
-    --cached_ids_path ${TOKENIZER_DIR}/cached_ids.npy
-    --tiger_config_path ${TOKENIZER_DIR}/tiger_config.json
-    --gin_config baselines/decoder/configs/decoder_setrec_yelp_t5small_v2_lr3e4_paper.gin
-    --vg_main_table_t5small_align
-  export_decoder: >
-    bash scripts/run_rq1.sh export-decoder
-    --cached_ids_path ${TOKENIZER_DIR}/cached_ids.npy
-    --tiger_config_path ${TOKENIZER_DIR}/tiger_config.json
-    --decoder_ckpt ${RUN_DIR}/checkpoint_4999.pt
-    --dataset_folder ${DATA_ROOT}/decoder
-    --domain amazon23_vg_tiger_strict
-    --hf_model_path ${MODEL_ROOT}/t5-small
-    --export_path ${RUN_DIR}/pred_topk.jsonl
-    --beam_size 64
-    --num_return_sequences 64
-    --topk_items 20
-    --batch_size 16
-    --force_num_user_tokens 0
-  evaluate: >
+  native_train_or_decode: >
+    bash scripts/run_rq1.sh native
+    --method <method>
+    --dataset <dataset>
+    --variant <optional-variant>
+    --run_dir ${RUN_ROOT}/rq1/<method>/<dataset>
+  evaluate_exported_predictions: >
     bash scripts/run_rq1.sh evaluate
-    --pred ${RUN_DIR}/pred_topk.jsonl
-    --dataset amazon23_vg
+    --pred ${RUN_ROOT}/rq1/<method>/<dataset>/pred_topk.jsonl
+    --dataset <dataset>
     --mode full
     --data_dir ${DATA_ROOT}/setrec_data
     --top_n 5,10
-    --output ${RUN_DIR}/metrics_full.json
+    --strict
+    --output ${RUN_ROOT}/rq1/<method>/<dataset>/metrics_full.json
+
+method_pipelines:
+  TIGER:
+    code: baselines/decoder
+    native_protocol: rqvae_tokenizer_then_tiger_decoder
+    train: train_rqvae.py followed by train_decoder.py
+    decoder: reference_rqvae_recommender_decoder
+    config_source: baselines/decoder/configs
+
+  T5-SemID:
+    code: baselines/ref02
+    native_protocol: howtoindex_llm_recsys_id_semid
+    train: main.py
+    export: test_only_llm_id.py
+    variant: semid
+
+  RPG:
+    code: baselines/ref04
+    native_protocol: faiss_opq_pq_sid_plus_graph_propagation
+    train_and_decode: main.py
+    config_source: baselines/ref04/genrec/default.yaml
+
+  LETTER-TIGER:
+    code: baselines/ref03/LETTER-TIGER
+    native_protocol: letter_rqvae_indices_plus_letter_tiger_decoder
+    train: finetune.py
+    decode: test.py
+
+  LETTER-LC-Rec:
+    code: baselines/ref03/LETTER-LC-Rec
+    native_protocol: letter_indices_plus_lc_rec_decoder
+    train: lora_finetune.py
+    decode: test_ddp.py
+
+  SETRec:
+    code: baselines/reference/code
+    native_protocol: setrec_t5
+    train: finetune_t5.py
+    decode: inference_t5.py
+
+  ETEGRec:
+    code: baselines/ref07
+    native_protocol: end_to_end_rqvae_recommender
+    train_and_decode: main.py
+    config_source: baselines/ref07/config/setrec_<dataset>.yaml
+
+  SEATER:
+    code: baselines/ref01
+    native_protocol: tree_structured_sid
+    train_and_decode: main.py
+    config_source: baselines/ref01/config
+
+  EAGER:
+    code: baselines/ref08
+    native_protocol: two_stream_behavior_semantic_tree
+    train_and_decode: train_rec_setrec.py
+    optional_pretrain: train_din_setrec.py
+
+  DiffGRM:
+    code: baselines/ref06
+    native_protocol: opq_pq_sid_with_diffusion_generator
+    train_and_decode: main.py
+    config_source: baselines/ref06/genrec/default.yaml
+
+  SASRec:
+    code: baselines/ref01/model/SASREC.py
+    native_protocol: sequential_cf_baseline
+    train_and_decode: seater_sasrec_mode
+
+  OneRec:
+    code: baselines/ref05
+    native_protocol: rq_kmeans_style_onerec_pipeline
+    train: python -m src.train
+    decode: python -m src.inference

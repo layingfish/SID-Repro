@@ -1,7 +1,8 @@
-protocol: unified_tiger_no_uid_decoder
+protocol: controlled_tiger_no_uid_decoder
 description: >
-  Unified decoder recipe used for manifest-based SID comparison. The wrapper
-  injects the selected cached IDs and per-position codebook layout.
+  Controlled decoder recipe used for manifest-based SID comparison in RQ3 and
+  additional alignment studies. It is not the RQ1 main-table protocol, where
+  each method keeps its native encoder and decoder.
 
 dataset:
   name: amazon23_vg

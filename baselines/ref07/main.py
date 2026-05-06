@@ -2,6 +2,7 @@ import yaml
 import argparse
 import warnings
 import torch
+import os
 from data import load_split_data
 from data import SequentialSplitDataset, Collator
 from torch.utils.data import DataLoader
@@ -121,6 +122,9 @@ if __name__=="__main__":
     config = {}
     config.update(yaml.safe_load(open(args.config, 'r')))
     config.update(command_line_configs)
+    for key, value in list(config.items()):
+        if isinstance(value, str):
+            config[key] = os.path.expandvars(value)
 
     world_size = int(os.environ.get("WORLD_SIZE", 1))
     local_rank = int(os.environ.get("LOCAL_RANK", 0))

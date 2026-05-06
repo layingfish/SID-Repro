@@ -1,0 +1,71 @@
+dataset: microlens_50k
+seed: 2020
+reproducibility: True
+log_dir: ${RUN_ROOT}/etegrec_setrec
+
+data_path: ${DATA_ROOT}/etegrec_setrec
+map_path: .emb_map.json
+semantic_emb_path: microlens_50k_emb_768.npy
+semantic_hidden_size: 768
+code_num: 4096
+code_length: 4
+
+epochs: 999
+lr_rec: 0.005
+lr_id: 0.0001
+weight_decay: 0.0
+
+id_vq_loss: 1
+id_code_loss: 0
+id_kl_loss: 0.0001
+id_dec_cl_loss: 0.0003
+
+rec_vq_loss: 0
+rec_code_loss: 1
+rec_kl_loss: 0.0001
+rec_dec_cl_loss: 0.0003
+
+cycle: 2
+sim: cos
+
+warmup_steps: 0
+batch_size: 4
+eval_batch_size: 4
+num_workers: 0
+eval_step: 2
+learner: AdamW
+lr_scheduler_type: cosine
+gradient_accumulation_steps: 1
+
+max_his_len: 50
+early_stop: 999
+
+metrics: recall@1,recall@5,ndcg@5,recall@10,ndcg@10
+valid_metric: ndcg@10
+
+max_length: 64
+encoder_layers: 1
+decoder_layers: 1
+d_model: 64
+d_ff: 256
+num_heads: 2
+d_kv: 32
+dropout_rate: 0.1
+activation_function: "relu"
+feed_forward_proj: "relu"
+num_beams: 10
+alpha: 1
+warm_epoch: 0
+
+num_emb_list: [256,256,256]
+beta: 0.25
+e_dim: 32
+layers: [256,128]
+vq_type: vq
+dist: l2
+tau: 0.07
+kmeans_init: False
+kmeans_iters: 10
+dropout_prob: 0.0
+bn: False
+loss_type: mse

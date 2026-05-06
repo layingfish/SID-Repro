@@ -1,153 +1,210 @@
-protocol: main_table_sid_tokenizers
-reference_item_embedding:
-  default_source: sentence-transformers/sentence-t5-base
-  default_dim: 768
-  file_template: ${DATA_ROOT}/setrec_data/${dataset}/${dataset}.emb-t5-tdcb.npy
+protocol: rq1_method_native_main_table
+scope: >
+  RQ1 does not force every method into a shared SID tokenizer or shared decoder.
+  Each entry records the native encoder, SID construction, decoder, and export
+  setting used by that method. Shared evaluation is defined in
+  configs/experiment/rq1_overall.yaml.
 
-common:
-  codebook_size: 256
-  semantic_code_length: 3
-  dedup_suffix: true
-  seed: 42
+reference_item_embedding:
+  setrec_text_source: sentence-transformers/sentence-t5-base
+  setrec_text_dim: 768
+  file_template: ${DATA_ROOT}/setrec_data/${dataset}/${dataset}.emb-t5-tdcb.npy
 
 methods:
   TIGER:
-    family: rqvae
+    code: baselines/decoder
+    sid_family: rqvae
     input_embedding: sentence_t5_item_text
     input_dim: 768
-    hidden_dims: [512, 256, 128]
-    embed_dim: 32
-    n_layers: 3
-    n_cat_feats: 0
-    codebook_size: 256
-    commitment_weight: 0.25
-    codebook_normalize: false
-    sim_vq: false
-    codebook_mode: rotation_trick
+    rqvae_hidden_dims: [512, 256, 128]
+    rqvae_embed_dim: 32
+    rqvae_n_layers: 3
+    rqvae_codebook_size: 256
+    decoder: reference_tiger_decoder
     duplicate_policy: suffix
+    submitted_backbone: t5-small
 
   T5-SemID:
-    family: howtoindex_semid
-    input_embedding: content_or_category_text
-    representation: content_based
-    backbone: p5_t5
-    uses_cf_embedding: false
-    duplicate_policy: deterministic_leaf_suffix
+    code: baselines/ref02
+    sid_family: howtoindex_semid
+    variant: semid
+    item_representation: content_based
+    data_order: random
+    backbone: t5-small
+    epochs: 20
+    lr: 0.001
+    warmup_prop: 0.05
+    clip: 1.0
+    train_sequential_item_batch: 64
+    train_sequential_yesno_batch: 16
+    train_direct_yesno_batch: 16
+    train_direct_candidate_batch: 8
+    train_direct_straightforward_batch: 16
+    export_script: test_only_llm_id.py
 
   RPG:
-    family: opq_pq_parallel_sid
-    metadata: sentence
-    sent_emb_model: text-embedding-3-large
-    sent_emb_dim: 3072
-    sent_emb_pca: 512
-    n_codebook: 32
+    code: baselines/ref04
+    sid_family: opq_pq_parallel_sid
+    sent_emb_model: setrec_t5_tdcb
+    sent_emb_dim: 768
+    sent_emb_pca: 0
     codebook_size: 256
-    opq_use_gpu: false
-    faiss_omp_num_threads: 32
-    n_edges: 50
-    propagation_steps: 3
-    num_beams: 50
-    temperature: 0.07
+    train_batch_size: 256
+    eval_batch_size: 32
+    epochs: 150
+    sent_emb_batch_size: 512
+    tokenizer_factory: OPQ{n_codebook},IVF1,PQ{n_codebook}x8
+    decoder: rpg_native_generator
+    graph_propagation: true
+    submitted_main_datasets:
+      microlens_50k:
+        n_codebook: 64
+        lr: 0.001
+        num_beams: 20
+        n_edges: 500
+        propagation_steps: 5
+      amazon23_vg:
+        n_codebook: 64
+        lr: 0.001
+        num_beams: 20
+        n_edges: 500
+        propagation_steps: 5
+      yelp:
+        n_codebook: 64
+        lr: 0.001
+        num_beams: 20
+        n_edges: 500
+        propagation_steps: 5
+    reference_domain_grid:
+      n_codebook: [16, 32, 64]
+      lr: [0.001, 0.003, 0.01]
+      temperature: 0.03
+      num_beams: [20, 100, 200]
+      n_edges: [20, 30, 200, 500]
+      propagation_steps: [3, 5]
 
   LETTER-TIGER:
-    family: letter_rqvae
+    code: baselines/ref03/LETTER-TIGER
+    sid_family: letter_rqvae
+    tokenizer_code: baselines/ref03/RQ-VAE
     input_embedding: sentence_t5_item_text
-    cf_embedding: sasrec_item_embedding
-    cf_embedding_dim: 64
-    num_emb_list: [256, 256, 256, 256]
-    e_dim: 32
-    layers: [2048, 1024, 512, 256, 128, 64]
-    lr: 0.001
-    weight_decay: 0.0001
-    batch_size: 1024
-    epochs: 20000
-    eval_step: 2000
-    optimizer: AdamW
-    alpha_cf_loss: 0.01
-    beta_diversity_loss: 0.0001
-    kmeans_init: true
-    kmeans_iters: 100
-    sk_epsilons: [0.0, 0.0, 0.0, 0.003]
-    sk_iters: 50
+    auxiliary_cf_embedding: sasrec_item_embedding
+    decoder: letter_tiger_t5
+    backbone: t5-small
+    per_device_batch_size: 256
+    learning_rate: 0.0005
+    epochs: 200
+    temperature: 1.0
+    num_beams: 20
+    index_file: .index.json
 
   LETTER-LC-Rec:
-    inherits: LETTER-TIGER
-    decoder_instantiation: lc_rec
+    code: baselines/ref03/LETTER-LC-Rec
+    sid_family: letter_rqvae
+    tokenizer_code: baselines/ref03/RQ-VAE
+    decoder: letter_lc_rec
+    index_file: .index.json
 
   SETRec:
-    family: setrec_t5
-    item_representation: sentence_t5_item_text
-    decoder_backbone: t5
-    uses_cf_embedding: false
+    code: baselines/reference/code
+    sid_family: setrec_t5
+    semantic_encoder: t5
+    backbone: t5-small
+    n_sem: 4
+    n_cf: 1
+    alpha: 0.7
+    n_query: 5
+    layers: [512, 256, 128]
+    batch_size: 512
+    micro_batch_size: 128
+    num_epochs: 30
+    learning_rate: 0.001
+    cutoff_len: 512
+    val_set_size: 2000
+    warmup_steps: 100
+    lr_scheduler: cosine
 
   ETEGRec:
-    family: end_to_end_rqvae
-    semantic_embedding: sasrec_item_embedding
-    semantic_embedding_dim: 256
-    code_num: 256
+    code: baselines/ref07
+    sid_family: end_to_end_rqvae
+    semantic_embedding: setrec_t5_item_text
+    semantic_embedding_dim: 768
+    code_num: 4096
     code_length: 4
-    max_length: 210
-    num_beams: 20
-    warmup_steps: 8000
-    weight_decay: 0.05
+    num_emb_list: [256, 256, 256]
+    epochs: 999
+    early_stop: 50
+    batch_size: 256
+    eval_batch_size: 256
+    config_template: baselines/ref07/config/setrec_<dataset>.yaml
 
   SEATER:
-    family: tree_structured_sid
-    tree_input_embedding: sasrec_item_embedding
-    embedding_dim: 64
-    tree_builder: balanced_kmeans_tree
-    max_history_length: 50
+    code: baselines/ref01
+    sid_family: tree_structured_sid
+    dataset_name_template: SETRec_<dataset>
+    model: SEATER
+    vocab: 8
+    epochs: 100
+    batch_size: 256
+    test_batch_size: 1024
+    decoder: seater_native_generator
 
   EAGER:
-    family: two_stream_behavior_semantic
+    code: baselines/ref08
+    sid_family: two_stream_behavior_semantic_tree
     behavior_embedding: din_item_embedding
-    behavior_embedding_dim: 96
     semantic_embedding: sentence_t5_item_text
-    semantic_embedding_dim: 768
-    kmeans_tree_k:
-      microlens_50k: 128
-      amazon23_vg: 256
-      yelp: 512
+    tree_num: 2
+    k: 128
     d_model: 96
-    decoder_layers: [4, 4]
-    use_gct: true
-    use_stt: true
+    enc_num_layers: 1
+    dec_num_layers: [2, 2]
+    n_head: 4
+    init_way: [embkm, embkm]
+    feature_ratio: 1.0
+    max_iters: 100
+    train_batch_size: 256
+    total_batch_num: 60000
+    eval_step: 300
+    topk: 10
+    rerank_topk: 10
     merge_method: confidence
-    din_pretrain_steps: 29000
-    main_train_steps: 60000
 
   DiffGRM:
-    family: opq_pq_diffusion
-    n_digit: 4
-    codebook_size: 256
-    metadata: sentence
-    sent_emb_model: sentence-transformers/sentence-t5-base
+    code: baselines/ref06
+    sid_family: opq_pq_diffusion
+    sent_emb_model: setrec_t5_tdcb
     sent_emb_dim: 768
     sent_emb_pca: 256
     normalize_after_pca: true
+    tokenizer_factory: OPQ4,IVF1,PQ4x8
+    n_digit: 4
     sid_quantizer: opq_pq
-    disable_opq: false
-    rq_kmeans_niters: 20
-    sid_random_seed: 2026
-    train_batch_size: 256
-    eval_batch_size: 32
-    lr: 0.003
-    weight_decay: 0.0
-    warmup_steps: 10000
+    force_regenerate_opq: true
+    masking_strategy: guided
+    guided_select: least
+    guided_conf_metric: msp
+    train_sliding: true
+    min_hist_len: 2
+    share_decoder_output_embedding: true
     epochs: 200
-    patience: 15
+    train_batch_size: 1024
+    eval_batch_size: 32
 
   SASRec:
-    family: sequential_cf
+    code: baselines/ref01/model/SASREC.py
+    sid_family: none
     item_embedding_source: learned_from_interactions
     max_history_length: 50
+    role: sequential_cf_baseline
 
   OneRec:
-    family: rq_kmeans_stage1
+    code: baselines/ref05
+    sid_family: rq_kmeans
     input_embedding: sentence_t5_item_text
     codebook_size: 256
     n_layers: 3
-    assignment: balanced_rq_kmeans
+    assignment: balanced_residual_kmeans
     max_iter: 50
     seed: 42
-    stage2_ipa_dpo: not_used
+    stage2_ipa_dpo: not_used_in_main_table

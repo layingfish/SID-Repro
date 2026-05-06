@@ -31,6 +31,7 @@ This project refers to the following public repositories:
 - https://github.com/Linxyhaha/SETRec
 - https://github.com/RUCAIBox/ETEGRec
 - https://github.com/liuzhao09/DiffGRM
+- https://github.com/yewzz/EAGER
 
 ## Running Experiments
 
@@ -84,57 +85,60 @@ raw input paths.
 
 ### RQ1: Overall benchmark
 
-RQ1 compares representative SID designs under the unified decoder/evaluation
-framework. The RQ-level protocol is in `configs/experiment/rq1_overall.yaml`;
-the main tokenizer settings are in `configs/tokenizer/main_table_tokenizers.yaml`;
-the decoder recipe is in `configs/decoder/main_table_decoder.yaml`.
+RQ1 compares representative SID designs with their method-native encoding and
+decoding pipelines. We do not force all methods into a shared decoder for the
+main table. The shared components are the SETRec-style data adapters, canonical
+item-id space, JSONL prediction export, and final evaluator. The RQ-level
+protocol is in `configs/experiment/rq1_overall.yaml`; the method-native settings
+are in `configs/tokenizer/main_table_tokenizers.yaml`.
 
 Methods: `TIGER`, `T5-SemID`, `RPG`, `LETTER-TIGER`, `LETTER-LC-Rec`,
 `SETRec`, `ETEGRec`, `SEATER`, `EAGER`, `DiffGRM`, `SASRec`, and `OneRec`.
 
 Main hyperparameters:
 
-| Component | Submitted setting |
+| Method | Native code path | Native SID and decoder setting |
 | --- | --- |
-| Reference text embedding | `sentence-transformers/sentence-t5-base`, 768-d |
-| Common SID codebook size | 256 unless the reference method defines a different internal vocabulary |
-| Main semantic code length | 3 semantic positions for the unified RQ-VAE/RQ-Kmeans-style setting; method-specific lengths are listed in `configs/tokenizer/main_table_tokenizers.yaml` |
-| Unified decoder | `t5-small`, no UID tokens, `iterations=5000`, `learning_rate=3e-4`, `weight_decay=0.035` |
-| Decoder batch schedule | `batch_size=64`, `gradient_accumulate_every=4`, bf16 AMP |
-| Export | `beam_size=64`, `num_return_sequences=64`, `topk_items=20`, `batch_size=16` |
-| Evaluation | full ranking mode, strict validation, `Recall@5/10` and `NDCG@5/10` |
+| `TIGER` | `baselines/decoder` | RQ-VAE tokenizer followed by the reference TIGER decoder |
+| `T5-SemID` | `baselines/ref02` | HowToIndex/LLM-ID `semid` variant with its native P5/T5 decoder and `test_only_llm_id.py` export |
+| `RPG` | `baselines/ref04` | Faiss OPQ/PQ SID plus RPG graph propagation and generator |
+| `LETTER-TIGER` | `baselines/ref03/LETTER-TIGER` | LETTER RQ-VAE indices with the LETTER-TIGER decoder |
+| `LETTER-LC-Rec` | `baselines/ref03/LETTER-LC-Rec` | LETTER indices with the LC-Rec decoder |
+| `SETRec` | `baselines/reference/code` | SETRec T5 semantic/CF query-token decoder |
+| `ETEGRec` | `baselines/ref07` | End-to-end RQ-VAE recommender with `setrec_<dataset>.yaml` configs |
+| `SEATER` | `baselines/ref01` | Tree-structured SID and native SEATER generator |
+| `EAGER` | `baselines/ref08` | Two-stream behavior/semantic tree model via `train_rec_setrec.py` |
+| `DiffGRM` | `baselines/ref06` | OPQ/PQ SID with DiffGRM diffusion generator |
+| `SASRec` | `baselines/ref01/model/SASREC.py` | Sequential CF baseline |
+| `OneRec` | `baselines/ref05` | RQ-Kmeans-style OneRec pipeline |
 
-Example manifest-based run:
+The submitted hyperparameters for these method-native runs are recorded in
+`configs/tokenizer/main_table_tokenizers.yaml`. A method-native run is launched
+with:
 
 ```bash
-bash scripts/run_rq1.sh train-decoder \
-  --cached_ids_path ${TOKENIZER_ROOT}/<method>/cached_ids.npy \
-  --tiger_config_path ${TOKENIZER_ROOT}/<method>/tiger_config.json \
-  --gin_config baselines/decoder/configs/decoder_setrec_yelp_t5small_v2_lr3e4_paper.gin \
-  --vg_main_table_t5small_align
+bash scripts/run_rq1.sh native \
+  --method <method> \
+  --dataset <dataset> \
+  --run_dir ${RUN_ROOT}/rq1/<method>/<dataset>
+```
 
-bash scripts/run_rq1.sh export-decoder \
-  --cached_ids_path ${TOKENIZER_ROOT}/<method>/cached_ids.npy \
-  --tiger_config_path ${TOKENIZER_ROOT}/<method>/tiger_config.json \
-  --decoder_ckpt ${RUN_ROOT}/<method>/checkpoint_4999.pt \
-  --dataset_folder ${DATA_ROOT}/decoder \
-  --domain amazon23_vg_tiger_strict \
-  --hf_model_path ${MODEL_ROOT}/t5-small \
-  --export_path ${RUN_ROOT}/<method>/pred_topk.jsonl \
-  --beam_size 64 \
-  --num_return_sequences 64 \
-  --topk_items 20 \
-  --batch_size 16 \
-  --force_num_user_tokens 0
+After each method exports predictions to JSONL, compute the reported metrics
+with the shared evaluator:
 
+```bash
 bash scripts/run_rq1.sh evaluate \
   --pred ${RUN_ROOT}/<method>/pred_topk.jsonl \
-  --dataset amazon23_vg \
+  --dataset <dataset> \
   --mode full \
   --data_dir ${DATA_ROOT}/setrec_data \
   --top_n 5,10 \
+  --strict \
   --output ${RUN_ROOT}/<method>/metrics_full.json
 ```
+
+Export helpers used for native outputs that do not directly emit the canonical
+JSONL format are provided under `scripts/exports/`.
 
 ### RQ2: Codebook utilization
 
@@ -183,9 +187,9 @@ Hyperparameter ranges:
 | Decoder schedule | `iterations=5000`, `learning_rate=3e-4`, `weight_decay=0.035`, no UID tokens |
 | Decoder batch schedule | small `64 x grad_acc 4`, base `32 x grad_acc 8`, large `16 x grad_acc 16` |
 
-Train/export/evaluate each SID length or backbone checkpoint with the same
-`train-decoder`, `export-decoder`, and `evaluate` subcommands used in RQ1,
-changing only the cached ID path, T5 backbone path, and output directory.
+Train/export/evaluate each SID length or backbone checkpoint with the RQ3
+`train-decoder`, `export-decoder`, and `evaluate` subcommands, changing only the
+cached ID path, T5 backbone path, and output directory.
 
 Inference-only diagnostics:
 
