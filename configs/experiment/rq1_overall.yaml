@@ -42,6 +42,7 @@ command_templates:
     --dataset_folder ${DATA_ROOT}/decoder
     --domain amazon23_vg_tiger_strict
     --hf_model_path ${MODEL_ROOT}/t5-small
+    --export_path ${RUN_DIR}/pred_topk.jsonl
     --beam_size 64
     --num_return_sequences 64
     --topk_items 20
