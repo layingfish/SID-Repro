@@ -1,0 +1,434 @@
+diff --git a/config/SETRec_beauty/SASREC.yaml b/config/SETRec_beauty/SASREC.yaml
+new file mode 100644
+index 0000000..c827866
+--- /dev/null
++++ b/config/SETRec_beauty/SASREC.yaml
+@@ -0,0 +1,17 @@
++lr: 0.001
++min_lr: 0.001
++weight_decay: 0.00001 # l2 norm
++patience: 2 # Number of epochs with no improvement after which learning rate will be reduced
++es_patience: 2 #patience for early stop
++
++dropout_rate: 0.2
++num_blocks: 1
++num_heads: 2
++
++## item embedding
++embedding_dim: 64
++# embedding_dim:
++  # ID: 48  #item ID
++  # cate: 16  #item ID
++
++num_neg: 1280
+\ No newline at end of file
+diff --git a/config/SETRec_beauty/SEATER.yaml b/config/SETRec_beauty/SEATER.yaml
+new file mode 100644
+index 0000000..8164805
+--- /dev/null
++++ b/config/SETRec_beauty/SEATER.yaml
+@@ -0,0 +1,43 @@
++lr: 0.001
++min_lr: 0.001
++weight_decay: 0.00001 # l2 norm
++# patience: 2 # Number of epochs with no improvement after which learning rate will be reduced
++es_patience: 4 #patience for early stop
++
++
++## item embedding
++embedding_dim: 64
++  # ID: 48  #item ID
++  # cate: 16
++
++d_model: 64
++
++Encoder:
++  N_layer: 1
++  nhead: 2
++  inner_dim: 256
++  dropout: 0.2
++
++Decoder:
++  N_layer: 1
++  nhead: 2
++  inner_dim: 256
++  dropout: 0.2
++
++
++## decoder item index
++decoder_index:
++  vocab_size: 2 # radix, such as decimal # will be rewriten according to the tree
++  embedding_dim: 64
++  tree_nodes_num: 1 # will be rewriten according to the tree
++  max_len: 1 #will be rewriten according to the tree
++
++rk_weight: 0.05
++
++rk_num_neg: 4
++rk_margin: 0.001
++
++rk_act : 'sigmoid'
++
++sm_temp: 0.2
++sm_weight: 0.05
+\ No newline at end of file
+diff --git a/config/SETRec_sports/SASREC.yaml b/config/SETRec_sports/SASREC.yaml
+new file mode 100644
+index 0000000..c827866
+--- /dev/null
++++ b/config/SETRec_sports/SASREC.yaml
+@@ -0,0 +1,17 @@
++lr: 0.001
++min_lr: 0.001
++weight_decay: 0.00001 # l2 norm
++patience: 2 # Number of epochs with no improvement after which learning rate will be reduced
++es_patience: 2 #patience for early stop
++
++dropout_rate: 0.2
++num_blocks: 1
++num_heads: 2
++
++## item embedding
++embedding_dim: 64
++# embedding_dim:
++  # ID: 48  #item ID
++  # cate: 16  #item ID
++
++num_neg: 1280
+\ No newline at end of file
+diff --git a/config/SETRec_sports/SEATER.yaml b/config/SETRec_sports/SEATER.yaml
+new file mode 100644
+index 0000000..8164805
+--- /dev/null
++++ b/config/SETRec_sports/SEATER.yaml
+@@ -0,0 +1,43 @@
++lr: 0.001
++min_lr: 0.001
++weight_decay: 0.00001 # l2 norm
++# patience: 2 # Number of epochs with no improvement after which learning rate will be reduced
++es_patience: 4 #patience for early stop
++
++
++## item embedding
++embedding_dim: 64
++  # ID: 48  #item ID
++  # cate: 16
++
++d_model: 64
++
++Encoder:
++  N_layer: 1
++  nhead: 2
++  inner_dim: 256
++  dropout: 0.2
++
++Decoder:
++  N_layer: 1
++  nhead: 2
++  inner_dim: 256
++  dropout: 0.2
++
++
++## decoder item index
++decoder_index:
++  vocab_size: 2 # radix, such as decimal # will be rewriten according to the tree
++  embedding_dim: 64
++  tree_nodes_num: 1 # will be rewriten according to the tree
++  max_len: 1 #will be rewriten according to the tree
++
++rk_weight: 0.05
++
++rk_num_neg: 4
++rk_margin: 0.001
++
++rk_act : 'sigmoid'
++
++sm_temp: 0.2
++sm_weight: 0.05
+\ No newline at end of file
+diff --git a/config/SETRec_steam/SASREC.yaml b/config/SETRec_steam/SASREC.yaml
+new file mode 100644
+index 0000000..c827866
+--- /dev/null
++++ b/config/SETRec_steam/SASREC.yaml
+@@ -0,0 +1,17 @@
++lr: 0.001
++min_lr: 0.001
++weight_decay: 0.00001 # l2 norm
++patience: 2 # Number of epochs with no improvement after which learning rate will be reduced
++es_patience: 2 #patience for early stop
++
++dropout_rate: 0.2
++num_blocks: 1
++num_heads: 2
++
++## item embedding
++embedding_dim: 64
++# embedding_dim:
++  # ID: 48  #item ID
++  # cate: 16  #item ID
++
++num_neg: 1280
+\ No newline at end of file
+diff --git a/config/SETRec_steam/SEATER.yaml b/config/SETRec_steam/SEATER.yaml
+new file mode 100644
+index 0000000..8164805
+--- /dev/null
++++ b/config/SETRec_steam/SEATER.yaml
+@@ -0,0 +1,43 @@
++lr: 0.001
++min_lr: 0.001
++weight_decay: 0.00001 # l2 norm
++# patience: 2 # Number of epochs with no improvement after which learning rate will be reduced
++es_patience: 4 #patience for early stop
++
++
++## item embedding
++embedding_dim: 64
++  # ID: 48  #item ID
++  # cate: 16
++
++d_model: 64
++
++Encoder:
++  N_layer: 1
++  nhead: 2
++  inner_dim: 256
++  dropout: 0.2
++
++Decoder:
++  N_layer: 1
++  nhead: 2
++  inner_dim: 256
++  dropout: 0.2
++
++
++## decoder item index
++decoder_index:
++  vocab_size: 2 # radix, such as decimal # will be rewriten according to the tree
++  embedding_dim: 64
++  tree_nodes_num: 1 # will be rewriten according to the tree
++  max_len: 1 #will be rewriten according to the tree
++
++rk_weight: 0.05
++
++rk_num_neg: 4
++rk_margin: 0.001
++
++rk_act : 'sigmoid'
++
++sm_temp: 0.2
++sm_weight: 0.05
+\ No newline at end of file
+diff --git a/config/SETRec_toys/SASREC.yaml b/config/SETRec_toys/SASREC.yaml
+new file mode 100644
+index 0000000..c827866
+--- /dev/null
++++ b/config/SETRec_toys/SASREC.yaml
+@@ -0,0 +1,17 @@
++lr: 0.001
++min_lr: 0.001
++weight_decay: 0.00001 # l2 norm
++patience: 2 # Number of epochs with no improvement after which learning rate will be reduced
++es_patience: 2 #patience for early stop
++
++dropout_rate: 0.2
++num_blocks: 1
++num_heads: 2
++
++## item embedding
++embedding_dim: 64
++# embedding_dim:
++  # ID: 48  #item ID
++  # cate: 16  #item ID
++
++num_neg: 1280
+\ No newline at end of file
+diff --git a/config/SETRec_toys/SEATER.yaml b/config/SETRec_toys/SEATER.yaml
+new file mode 100644
+index 0000000..8164805
+--- /dev/null
++++ b/config/SETRec_toys/SEATER.yaml
+@@ -0,0 +1,43 @@
++lr: 0.001
++min_lr: 0.001
++weight_decay: 0.00001 # l2 norm
++# patience: 2 # Number of epochs with no improvement after which learning rate will be reduced
++es_patience: 4 #patience for early stop
++
++
++## item embedding
++embedding_dim: 64
++  # ID: 48  #item ID
++  # cate: 16
++
++d_model: 64
++
++Encoder:
++  N_layer: 1
++  nhead: 2
++  inner_dim: 256
++  dropout: 0.2
++
++Decoder:
++  N_layer: 1
++  nhead: 2
++  inner_dim: 256
++  dropout: 0.2
++
++
++## decoder item index
++decoder_index:
++  vocab_size: 2 # radix, such as decimal # will be rewriten according to the tree
++  embedding_dim: 64
++  tree_nodes_num: 1 # will be rewriten according to the tree
++  max_len: 1 #will be rewriten according to the tree
++
++rk_weight: 0.05
++
++rk_num_neg: 4
++rk_margin: 0.001
++
++rk_act : 'sigmoid'
++
++sm_temp: 0.2
++sm_weight: 0.05
+\ No newline at end of file
+diff --git a/config/const.py b/config/const.py
+index e341224..f90e072 100644
+--- a/config/const.py
++++ b/config/const.py
+@@ -76,3 +76,103 @@ class MIND_Config(object):
+         # experiment const config
+         self.reco_his_max_length = 20 
+ 
++
++
++class SETRec_beauty_Config(object):
++    def __init__(self) -> None:
++
++        # data file path
++        self.datafile_par_path = "/data/xqp_data/RecSys26/datasets/seater_setrec/beauty"
++        self.training_file = "dataset/training.tsv"
++        self.validation_file = "dataset/validation.tsv"
++        self.test_file = "dataset/test.tsv"
++        self.itemID_2_attr = "vocab/item_2_attr_mapping.npy"
++
++        # for tree-based index
++        self.tree_data_par_path = "/data/xqp_data/RecSys26/datasets/seater_setrec/beauty/tree_data_SASREC"
++        self.tree_based_itemID_2_indexID = "itemID_2_tree_indexID.npy"
++        self.tree_based_prefix_tree = "tree_node_allowed_next_tokens.npy"
++
++        self.two_tower_item_emb = "vocab/beauty_SASREC_item_emb.npy"
++
++        # dataset config
++        self.users_ID_num = 18136
++        self.item_ID_num = 12024 + 1 # zero for padding
++
++        # experiment const config
++        self.reco_his_max_length = 50
++
++
++class SETRec_toys_Config(object):
++    def __init__(self) -> None:
++
++        # data file path
++        self.datafile_par_path = "/data/xqp_data/RecSys26/datasets/seater_setrec/toys"
++        self.training_file = "dataset/training.tsv"
++        self.validation_file = "dataset/validation.tsv"
++        self.test_file = "dataset/test.tsv"
++        self.itemID_2_attr = "vocab/item_2_attr_mapping.npy"
++
++        # for tree-based index
++        self.tree_data_par_path = "/data/xqp_data/RecSys26/datasets/seater_setrec/toys/tree_data_SASREC"
++        self.tree_based_itemID_2_indexID = "itemID_2_tree_indexID.npy"
++        self.tree_based_prefix_tree = "tree_node_allowed_next_tokens.npy"
++
++        self.two_tower_item_emb = "vocab/toys_SASREC_item_emb.npy"
++
++        # dataset config
++        self.users_ID_num = 15635
++        self.item_ID_num = 11908 + 1 # zero for padding
++
++        # experiment const config
++        self.reco_his_max_length = 50
++
++
++class SETRec_sports_Config(object):
++    def __init__(self) -> None:
++
++        # data file path
++        self.datafile_par_path = "/data/xqp_data/RecSys26/datasets/seater_setrec/sports"
++        self.training_file = "dataset/training.tsv"
++        self.validation_file = "dataset/validation.tsv"
++        self.test_file = "dataset/test.tsv"
++        self.itemID_2_attr = "vocab/item_2_attr_mapping.npy"
++
++        # for tree-based index
++        self.tree_data_par_path = "/data/xqp_data/RecSys26/datasets/seater_setrec/sports/tree_data_SASREC"
++        self.tree_based_itemID_2_indexID = "itemID_2_tree_indexID.npy"
++        self.tree_based_prefix_tree = "tree_node_allowed_next_tokens.npy"
++
++        self.two_tower_item_emb = "vocab/sports_SASREC_item_emb.npy"
++
++        # dataset config
++        self.users_ID_num = 27591
++        self.item_ID_num = 18340 + 1 # zero for padding
++
++        # experiment const config
++        self.reco_his_max_length = 50
++
++
++class SETRec_steam_Config(object):
++    def __init__(self) -> None:
++
++        # data file path
++        self.datafile_par_path = "/data/xqp_data/RecSys26/datasets/seater_setrec/steam"
++        self.training_file = "dataset/training.tsv"
++        self.validation_file = "dataset/validation.tsv"
++        self.test_file = "dataset/test.tsv"
++        self.itemID_2_attr = "vocab/item_2_attr_mapping.npy"
++
++        # for tree-based index
++        self.tree_data_par_path = "/data/xqp_data/RecSys26/datasets/seater_setrec/steam/tree_data_SASREC"
++        self.tree_based_itemID_2_indexID = "itemID_2_tree_indexID.npy"
++        self.tree_based_prefix_tree = "tree_node_allowed_next_tokens.npy"
++
++        self.two_tower_item_emb = "vocab/steam_SASREC_item_emb.npy"
++
++        # dataset config
++        self.users_ID_num = 32919
++        self.item_ID_num = 14330 + 1 # zero for padding
++
++        # experiment const config
++        self.reco_his_max_length = 50
+diff --git a/trainer.py b/trainer.py
+index 38ba7ec..1976840 100644
+--- a/trainer.py
++++ b/trainer.py
+@@ -87,7 +87,7 @@ class Trainer(object):
+         self.train_dataloader = data.get_dataloader(
+             data_set = getattr(data, f'{self.model_name.upper()}_Dataset')(self.dm, mode='training'),
+             bs = self.dm.batch_size,
+-            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else 2, 
++            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else None, 
+             num_workers = self.dm.num_workers,
+             shuffle=True
+         )
+@@ -95,14 +95,14 @@ class Trainer(object):
+         self.valid_dataloader =  data.get_dataloader(
+             data_set = getattr(data, f'{self.model_name.upper()}_Dataset')(self.dm, mode='validation'),
+             bs = self.dm.test_batch_size,
+-            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else 2, 
++            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else None, 
+             num_workers = self.dm.num_workers
+         )
+         # test dataloader
+         self.test_dataloader =  data.get_dataloader(
+             data_set = getattr(data, f'{self.model_name.upper()}_Dataset')(self.dm, mode='test'),
+             bs = self.dm.test_batch_size,
+-            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else 2, 
++            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else None, 
+             num_workers = self.dm.num_workers
+         )
+ 

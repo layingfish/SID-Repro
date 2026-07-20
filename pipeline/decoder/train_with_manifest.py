@@ -161,6 +161,9 @@ def main():
                 "train.num_user_tokens=0",
                 "train.iterations=5000",
                 "train.save_model_every=5000",
+                "train.full_eval_every=5000",
+                f'train.early_stopping_metric="ndcg@10_slice_:{sem_id_dim}"',
+                "train.early_stopping_patience=3",
                 "train.learning_rate=0.0003",
                 "train.weight_decay=0.035",
             ]

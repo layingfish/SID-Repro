@@ -1,0 +1,39 @@
+diff --git a/code/finetune_qwen.py b/code/finetune_qwen.py
+index 18fd031..d5f8929 100644
+--- a/code/finetune_qwen.py
++++ b/code/finetune_qwen.py
+@@ -45,7 +45,7 @@ def train(args):
+         print("gradient_accumulation_steps: ", gradient_accumulation_steps)
+ 
+     dataset = SequentialDataset(args.data_path, 50, args.n_query, args.n_sem)
+-    user_embed, item_embed = None, pickle.load(open(f'../data/{args.data_path}/SASRec_item_embed.pkl', 'rb'))
++    user_embed, item_embed = None, pickle.load(open(os.path.join(args.data_path, "SASRec_item_embed.pkl"), "rb"))
+     prefix = args.data_path.split("/")[-2]
+     feat_path = f"{args.data_path}{prefix}.emb-{args.sem_encoder}-tdcb.npy" 
+ 
+diff --git a/code/finetune_t5.py b/code/finetune_t5.py
+index 122e0e0..4bbb850 100644
+--- a/code/finetune_t5.py
++++ b/code/finetune_t5.py
+@@ -58,7 +58,7 @@ def train(args):
+ 
+     dataset = SequentialDataset(args.data_path, 50, args.n_query, args.n_sem)
+ 
+-    user_embed, item_embed = None, pickle.load(open(f'../data/{args.data_path}/SASRec_item_embed.pkl', 'rb'))
++    user_embed, item_embed = None, pickle.load(open(os.path.join(args.data_path, "SASRec_item_embed.pkl"), "rb"))
+ 
+     prefix = args.data_path.split("/")[-2]
+     feat_path = f"{args.data_path}{prefix}.emb-{args.sem_encoder}-tdcb.npy" 
+diff --git a/code/inference_t5.py b/code/inference_t5.py
+index 5f93332..86c861f 100644
+--- a/code/inference_t5.py
++++ b/code/inference_t5.py
+@@ -54,7 +54,7 @@ def inference(args):
+         print("gradient_accumulation_steps: ", gradient_accumulation_steps)
+ 
+     dataset = SequentialDataset(args.data_path, 50, args.n_query, args.n_sem)
+-    user_embed, item_embed = None, pickle.load(open(f'../data/{args.data_path}/SASRec_item_embed.pkl', 'rb'))
++    user_embed, item_embed = None, pickle.load(open(os.path.join(args.data_path, "SASRec_item_embed.pkl"), "rb"))
+     prefix = args.data_path.split("/")[-2]
+     feat_path = f"{args.data_path}{prefix}.emb-{args.sem_encoder}-tdcb.npy" 
+     item_feature = torch.FloatTensor(np.load(feat_path, allow_pickle=True))

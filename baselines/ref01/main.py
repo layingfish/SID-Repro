@@ -27,13 +27,15 @@ parser.add_argument('--batch_size', type=int, help='training batch_size', defaul
 parser.add_argument('--test_batch_size', type=int, help='testing batch_size', default=0)
 parser.add_argument('--vocab', type=int, help='#branches of tree structure', default=8)
 parser.add_argument('--random_seed', type=int, help='random seed', default=2023)
+parser.add_argument('--test_only', action='store_true', help='Skip training, run test only')
+parser.add_argument('--ckpt_path', type=str, default=None, help='Checkpoint path for test-only mode')
 
 parser.add_argument('--new_config', type=str, help='update model config', default='')
 
 args = parser.parse_args()
 
 def setup_seed(seed):
-
+    '''setting random seeds'''
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -43,15 +45,34 @@ def setup_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
 setup_seed(args.random_seed)
 
-
+# update paremeter w.r.t dataset
 dataset_paras = {
-    'Yelp': {'batch_size': 256, 'test_batch_size': 1024, 'epochs': 50},
-    'MIND': {'batch_size': 256, 'test_batch_size': 1024, 'epochs': 50},
-    'Books': {'batch_size': 2048, 'test_batch_size': 2048, 'epochs': 60},
+    "Yelp": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
+    "MIND": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
+    "Books": {"batch_size": 2048, "test_batch_size": 2048, "epochs": 60},
+    "SETRec_beauty": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
+    "SETRec_toys": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
+    "SETRec_sports": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
+    "SETRec_steam": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
+    "SETRec_microlens_50k": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
+    "SETRec_microlens_50k_care": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
+    "SETRec_microlens_100k": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
+    "SETRec_microlens_1m": {"batch_size": 512, "test_batch_size": 2048, "epochs": 50},
+    "SETRec_amazon23_vg": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
+    "SETRec_yelp": {"batch_size": 256, "test_batch_size": 1024, "epochs": 50},
 }
-if args.batch_size == 0 : args.batch_size = dataset_paras[args.dataset_name]['batch_size']
-if args.test_batch_size == 0: args.test_batch_size = dataset_paras[args.dataset_name]['test_batch_size']
-if args.epochs == 0: args.epochs = dataset_paras[args.dataset_name]['epochs']
+if args.dataset_name not in dataset_paras:
+    raise KeyError(
+        f"Unknown dataset_name={args.dataset_name!r}. "
+        f"Known: {sorted(dataset_paras.keys())}. "
+        f"You can also set --batch_size/--test_batch_size/--epochs to non-zero and patch main.py to bypass defaults."
+    )
+if args.batch_size == 0:
+    args.batch_size = dataset_paras[args.dataset_name]["batch_size"]
+if args.test_batch_size == 0:
+    args.test_batch_size = dataset_paras[args.dataset_name]["test_batch_size"]
+if args.epochs == 0:
+    args.epochs = dataset_paras[args.dataset_name]["epochs"]
 
 new_config = {} if args.new_config == '' else eval(args.new_config)
 cur_hyper_paras = [(k ,v) for k,v in new_config.items()]
@@ -68,5 +89,8 @@ dm = DatasetManager(args)
 
 trainer = cm.set_trainer(args, cm, dm, new_config)
 
-trainer.train()
-trainer.test()
+if args.test_only:
+    trainer.test(assigned_model_path=args.ckpt_path)
+else:
+    trainer.train()
+    trainer.test()

@@ -1,0 +1,181 @@
+diff --git a/CID_generation.py b/CID_generation.py
+index 89c90a3..4857c5c 100644
+--- a/CID_generation.py
++++ b/CID_generation.py
+@@ -5,7 +5,7 @@ from itertools import combinations
+ from sklearn.cluster import SpectralClustering
+ import numpy as np
+ import networkx as nx
+-import matplotlib.pyplot as plt
++# matplotlib is optional; not needed for index generation
+ import json
+ from numpy import linalg as LA
+ import scipy
+diff --git a/item_rep_method.py b/item_rep_method.py
+index 997e71b..39f643b 100644
+--- a/item_rep_method.py
++++ b/item_rep_method.py
+@@ -23,6 +23,28 @@ import pickle as pkl
+ warnings.filterwarnings("ignore")
+ 
+ 
++_DIGITS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
++
++
++def change_base(num_str, base):
++    """Convert a non-negative base-10 integer string to the given base.
++
++    This helper is used by the item ID indexing utilities.
++    """
++    n = int(num_str)
++    if n < 0:
++        raise ValueError(f"num_str must be non-negative, got {num_str!r}")
++    if base < 2 or base > len(_DIGITS):
++        raise ValueError(f"base must be in [2, {len(_DIGITS)}], got {base}")
++    if n == 0:
++        return "0"
++    out = []
++    while n:
++        n, r = divmod(n, base)
++        out.append(_DIGITS[r])
++    return "".join(reversed(out))
++
++
+ def random_number(max_number, min_number=0):
+     randomized_number = list(range(min_number, max_number))
+     random.shuffle(randomized_number)
+diff --git a/main.py b/main.py
+index 3afd4ec..025e46d 100644
+--- a/main.py
++++ b/main.py
+@@ -36,6 +36,7 @@ import torch.multiprocessing as mp
+ import time
+ from generation_trie import Trie
+ import os
++import json
+ from collections import OrderedDict
+ 
+ transformers.logging.set_verbosity_error()
+@@ -426,7 +427,11 @@ def trainer(
+             logger.log("test ncdg @ 10 is {}".format(ncdg_test_10))
+ 
+         if recall_validation_10 > best_validation_recall:
+-            model_dir = "best_" + args.model_dir
++            model_dir = args.model_dir
++            if os.path.isabs(model_dir):
++                model_dir = os.path.join(os.path.dirname(model_dir), "best_" + os.path.basename(model_dir))
++            else:
++                model_dir = "best_" + model_dir
+             logger.log(
+                 "recall increases from {} ----> {} at epoch {}".format(
+                     best_validation_recall, recall_validation_10, epoch
+@@ -434,6 +439,7 @@ def trainer(
+             )
+             if rank == 0:
+                 logger.log("save current best model to {}".format(model_dir))
++                os.makedirs(os.path.dirname(model_dir) or ".", exist_ok=True)
+                 torch.save(model.module.state_dict(), model_dir)
+             best_validation_recall = recall_validation_10
+ 
+@@ -679,8 +685,8 @@ def parse_argument():
+     parser.add_argument(
+         "--number_of_items",
+         type=int,
+-        default=12102,
+-        help="number of items in each dataset, beauty 12102, toys 11925, sports 18358",
++        default=0,
++        help="number of items + 1 (ids are 1..N). If 0, infer from datamaps.json.",
+     )
+ 
+     # item representation experiment setting
+@@ -688,7 +694,7 @@ def parse_argument():
+         "--item_representation",
+         type=str,
+         default="None",
+-        help="random_number, random_one_token, no_tokenization, item_resolution, content_based,title,CF,hybrid, None",
++        help="number of items + 1 (ids are 1..N). If 0, infer from datamaps.json.",
+     )
+ 
+     # arguments for collaborative indexing
+@@ -808,15 +814,28 @@ def parse_argument():
+ 
+     args = parser.parse_args()
+ 
+-    if args.task == "beauty":
+-        args.number_of_items = 12102
+-    elif args.task == "toys":
+-        args.number_of_items = 11925
+-    elif args.task == "sports":
+-        args.number_of_items = 18358
+-    else:
+-        assert args.task == "yelp"
+-        args.number_of_items = 20034
++    if args.number_of_items <= 0:
++        datamaps_path = os.path.join(args.data_dir, args.task, "datamaps.json")
++        if os.path.exists(datamaps_path):
++            with open(datamaps_path, "r") as f:
++                datamaps = json.load(f)
++            # id2item is a dict: {"1": "I0", ...}
++            args.number_of_items = len(datamaps["id2item"]) + 1
++        else:
++            # Backward-compatible defaults
++            if args.task == "beauty":
++                args.number_of_items = 12102
++            elif args.task == "toys":
++                args.number_of_items = 11925
++            elif args.task == "sports":
++                args.number_of_items = 18358
++            elif args.task == "yelp":
++                args.number_of_items = 20034
++            else:
++                raise ValueError(
++                    f"Unknown task={args.task!r} and could not find datamaps.json at {datamaps_path}. "
++                    "Please pass --number_of_items."
++                )
+ 
+     return args
+ 
+diff --git a/modeling_p5.py b/modeling_p5.py
+index 3082e20..a1586d5 100644
+--- a/modeling_p5.py
++++ b/modeling_p5.py
+@@ -104,8 +104,14 @@ class JointEncoder(T5Stack):
+             )  ### embedding step - add HERE ###
+             if whole_word_ids is not None:
+                 if whole_word_embedding_type == "shijie":
++                    whole_word_ids = whole_word_ids.clamp(
++                        min=0, max=self.whole_word_embeddings.num_embeddings - 1
++                    )
+                     whole_word_embeds = self.whole_word_embeddings(whole_word_ids)
+                 else:
++                    whole_word_ids = whole_word_ids.clamp(
++                        min=0, max=self.position_embeddings.num_embeddings - 1
++                    )
+                     whole_word_embeds = self.position_embeddings(whole_word_ids)
+                 assert whole_word_embeds.shape[-1] == inputs_embeds.shape[-1]
+                 inputs_embeds = inputs_embeds + whole_word_embeds
+diff --git a/utils.py b/utils.py
+index 5620935..3532dae 100644
+--- a/utils.py
++++ b/utils.py
+@@ -182,10 +182,19 @@ def exact_match(predictions, targets, scores, total_sequence_generated):
+     return hit_1, hit_5, hit_10, ncdg_5, ncdg_10
+ 
+ 
+-def prefix_allowed_tokens_fn(candidate_trie):
++def prefix_allowed_tokens_fn(candidate_trie, fallback_token_id: int = 1):
++    """Return a HF `prefix_allowed_tokens_fn` that never returns an empty list.
++
++    Some datasets / checkpoints may produce prefixes not present in the candidate trie.
++    HF generation treats an empty allowed-token set as an unsatisfiable constraint and raises.
++    We fall back to allowing EOS (default: 1 for T5) to gracefully terminate generation.
++    """
++
+     def prefix_allowed_tokens(batch_id, sentence):
+         sentence = sentence.tolist()
+         trie_out = candidate_trie.get(sentence)
++        if not trie_out:
++            return [fallback_token_id]
+         return trie_out
+ 
+     return prefix_allowed_tokens

@@ -1,0 +1,594 @@
+diff --git a/EAGER/train_rec_setrec.py b/EAGER/train_rec_setrec.py
+new file mode 100755
+index 0000000..f0e5e0b
+--- /dev/null
++++ b/EAGER/train_rec_setrec.py
+@@ -0,0 +1,588 @@
++"""EAGER on SETRec datasets (beauty/toys/sports/steam).
++
++This adapter is for RecSys26 strict reproductions on the SETRec paper dataset.
++
++Key choices:
++- Training uses SETRec training_dict.npy only.
++- Validation uses multi-target labels from validation_dict.npy.
++- Test export uses multi-target labels from testing_dict.npy.
++- Test histories are built from train+val (no test leakage).
++
++Outputs:
++- Saves checkpoints to --ckpt_dir (best on val NDCG@10 + last).
++- Exports predictions JSONL to --pred_out (top-k per user) for unified_eval.
++"""
++
++import argparse
++import json
++import math
++import os
++import random
++from pathlib import Path
++
++import numpy as np
++import torch
++
++from lib.generate_train_and_test_data import _gen_train_sample
++from lib.generate_training_batches import Train_instance
++from lib import Trm4Rec
++
++from optimizers import AdamOptimizer
++from optimizers.lr_schedulers import InverseSquareRootSchedule
++
++
++def build_sample_from_user_seqs(user_seqs: dict[int, list[int]]) -> dict[str, np.ndarray]:
++    user_ids: list[int] = []
++    item_ids: list[int] = []
++    timestamps: list[int] = []
++
++    for user_id, seq in user_seqs.items():
++        for t, item_id in enumerate(seq):
++            user_ids.append(int(user_id))
++            item_ids.append(int(item_id))
++            timestamps.append(int(t))
++
++    user_ids_arr = np.asarray(user_ids, dtype=np.int64)
++    item_ids_arr = np.asarray(item_ids, dtype=np.int64)
++    timestamps_arr = np.asarray(timestamps, dtype=np.int64)
++
++    zeros = np.zeros_like(user_ids_arr)
++    return {
++        "USERID": user_ids_arr,
++        "ITEMID": item_ids_arr,
++        "CATID": zeros,
++        "BEHAV": zeros,
++        "TS": timestamps_arr,
++    }
++
++
++def _pad_left(seq: list[int], length: int, pad_value: int = -1) -> list[int]:
++    if length <= 0:
++        return []
++    if len(seq) >= length:
++        return seq[-length:]
++    return [pad_value] * (length - len(seq)) + seq
++
++
++def write_instances_file(
++    out_path: Path,
++    user_histories: dict[int, list[int]],
++    user_labels: dict[int, list[int]],
++    history_len: int,
++    include_only_nonempty_labels: bool,
++) -> list[int]:
++    """Write EAGER instance file.
++
++    Format per line (compatible with Train_instance.read_*_instances_file):
++      user_id|h1,h2,...,h_{history_len}|label1,label2,...
++
++    Returns the ordered list of user_ids written.
++    """
++    out_path.parent.mkdir(parents=True, exist_ok=True)
++    users: list[int] = []
++
++    with out_path.open("w", encoding="utf-8") as f:
++        for user_id in sorted(user_histories.keys()):
++            labels = user_labels.get(user_id, [])
++            if include_only_nonempty_labels and (not labels):
++                continue
++            history = [int(x) for x in user_histories[user_id]]
++            history_fixed = _pad_left(history, history_len, pad_value=-1)
++            label_str = ",".join(str(int(x)) for x in labels)
++            hist_str = ",".join(str(x) for x in history_fixed)
++            line = f"{int(user_id)}|{hist_str}|{label_str}\n"
++            users.append(int(user_id))
++            f.write(line)
++
++    return users
++
++
++def presision(result_list, gt_list, top_k):
++    count = 0.0
++    for r, g in zip(result_list, gt_list):
++        count += len(set(r).intersection(set(g)))
++    return count / (top_k * len(result_list))
++
++
++def recall(result_list, gt_list):
++    t = 0.0
++    for r, g in zip(result_list, gt_list):
++        t += 1.0 * len(set(r).intersection(set(g))) / len(g)
++    return t / len(result_list)
++
++
++def hit_ratio(result_list, gt_list):
++    intersect_set = [len(set(r) & set(g)) for r, g in zip(result_list, gt_list)]
++    return 1.0 * sum(intersect_set) / sum([len(gts) for gts in gt_list])
++
++
++def ndcg_bug(result_list, gt_list):
++    t = 0.0
++    for re, gt in zip(result_list, gt_list):
++        setgt = set(gt)
++        indicator = np.asfarray([1 if r in setgt else 0 for r in re])
++        sorted_indicator = indicator[indicator.argsort(-1)[::-1]]
++        if 1 in indicator:
++            t += np.sum(indicator / np.log2(1.0 * np.arange(2, len(indicator) + 2))) / np.sum(
++                sorted_indicator / np.log2(1.0 * np.arange(2, len(indicator) + 2))
++            )
++    return t / len(gt_list)
++
++
++def rerank(batch_x, label, train_model_list, rerank_topk, type_list):
++    tree_num = len(train_model_list)
++    if tree_num == 1:
++        return label
++
++    device = batch_x.device
++    scores = torch.full((len(batch_x), rerank_topk * tree_num), -1e15, device=device)
++    input_labels = torch.zeros((len(batch_x), rerank_topk * tree_num), dtype=torch.int64, device=device)
++    max_lenr = rerank_topk
++
++    for i, result in enumerate(label):
++        r = torch.LongTensor(list(set(result.tolist()))).to(device)
++        scores[i, 0 : len(r)] = 0.0
++        input_labels[i, 0 : len(r)] = r
++        max_lenr = max(max_lenr, len(r))
++
++    scores = scores[:, 0:max_lenr]
++    input_labels = input_labels[:, 0:max_lenr]
++    input_user = batch_x.repeat_interleave(max_lenr, dim=0)
++    input_item = input_labels.reshape(-1)
++
++    with torch.no_grad():
++        for j in range(tree_num):
++            scores += train_model_list[j].compute_scores(input_user, input_item, type=type_list[j]).sum(-1).view(
++                batch_x.shape[0], -1
++            )
++        argindex = scores.argsort(-1, True)[:, :rerank_topk]
++        final_result = input_labels.gather(index=argindex, dim=-1)
++
++    return final_result
++
++
++def _save_checkpoint(path: Path, train_model_list, meta: dict) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    ckpt = {
++        "meta": meta,
++        "state_dicts": [m.trm_model.state_dict() for m in train_model_list],
++    }
++    torch.save(ckpt, str(path))
++
++
++def _load_checkpoint(path: Path, train_model_list) -> dict:
++    ckpt = torch.load(str(path), map_location="cpu")
++    state_dicts = ckpt.get("state_dicts", [])
++    if len(state_dicts) != len(train_model_list):
++        raise ValueError(f"Checkpoint tree_num mismatch: {len(state_dicts)} vs {len(train_model_list)}")
++    for i, m in enumerate(train_model_list):
++        m.trm_model.load_state_dict(state_dicts[i])
++    return ckpt
++
++
++def _predict_all(
++    instances: torch.Tensor,
++    train_model_list,
++    type_list,
++    topk: int,
++    rerank_topk: int,
++    batch_size: int,
++) -> np.ndarray:
++    num_batch = math.ceil(instances.shape[0] / batch_size)
++    all_batches: list[torch.Tensor] = []
++
++    for j in range(num_batch):
++        batch_user = instances[j * batch_size : (j + 1) * batch_size].to("cuda")
++        batch_result_list = []
++        for i in range(len(train_model_list)):
++            batch_result_one_tree = train_model_list[i].predict(batch_user, topk=topk, type=type_list[i])
++            batch_result_list.append(batch_result_one_tree)
++
++        batch_result = torch.cat(batch_result_list, dim=-1)
++        batch_result = rerank(batch_user, batch_result, train_model_list, rerank_topk, type_list)
++        all_batches.append(batch_result.detach().cpu())
++
++    return torch.cat(all_batches, dim=0).numpy()
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--domain", type=str, required=True, choices=["beauty", "toys", "sports", "steam"])
++    parser.add_argument("--data_root", type=str, default="/data/xqp_data/RecSys26/datasets/setrec_data")
++    parser.add_argument("--output_dir", type=str, default="/data/xqp_data/RecSys26/logs/eager_setrec")
++    parser.add_argument("--seed", type=int, default=2024)
++
++    parser.add_argument("--seq_len", type=int, default=20)
++    parser.add_argument("--min_seq_len", type=int, default=5)
++    parser.add_argument("--train_sample_seg_cnt", type=int, default=10)
++    parser.add_argument("--parall", type=int, default=8)
++    parser.add_argument("--force_regen", action="store_true")
++
++    parser.add_argument("--tree_num", type=int, default=2)
++    parser.add_argument("--k", type=int, default=128)
++    parser.add_argument("--d_model", type=int, default=96)
++    parser.add_argument("--enc_num_layers", type=int, default=1)
++    parser.add_argument("--dec_num_layers", type=str, default="2,2")
++    parser.add_argument("--n_head", type=int, default=4)
++    parser.add_argument("--init_way", type=str, default="embkm,embkm")
++    parser.add_argument("--feature_ratio", type=float, default=1.0)
++    parser.add_argument("--max_iters", type=int, default=100)
++
++    parser.add_argument("--train_batch_size", type=int, default=256)
++    parser.add_argument("--total_batch_num", type=int, default=6000)
++    parser.add_argument("--eval_step", type=int, default=300)
++
++    parser.add_argument("--eval_topk", type=int, default=10)
++    parser.add_argument("--eval_rerank_topk", type=int, default=10)
++    parser.add_argument("--export_topk", type=int, default=20)
++    parser.add_argument("--export_rerank_topk", type=int, default=20)
++    parser.add_argument("--pred_out", type=str, default="")
++    parser.add_argument("--ckpt_dir", type=str, default="")
++
++    parser.add_argument("--lr", type=float, default=1e-3)
++    parser.add_argument("--weight_decay", type=float, default=1e-7)
++    parser.add_argument("--warmup_updates", type=int, default=2000)
++    parser.add_argument("--warmup_init_lr", type=float, default=1e-7)
++
++    args = parser.parse_args()
++
++    torch.backends.cudnn.enabled = True
++    torch.backends.cudnn.deterministic = True
++    torch.backends.cudnn.benchmark = False
++
++    random.seed(args.seed)
++    np.random.seed(args.seed)
++    torch.manual_seed(args.seed)
++    torch.cuda.manual_seed(args.seed)
++    torch.cuda.manual_seed_all(args.seed)
++    os.environ["PYTHONHASHSEED"] = str(args.seed)
++
++    domain_dir = Path(args.data_root) / args.domain
++    out_root = Path(args.output_dir)
++    out_root.mkdir(parents=True, exist_ok=True)
++
++    processed_dir = out_root / "processed"
++    processed_dir.mkdir(parents=True, exist_ok=True)
++
++    ckpt_dir = Path(args.ckpt_dir) if args.ckpt_dir else (out_root / "ckpt")
++    ckpt_dir.mkdir(parents=True, exist_ok=True)
++
++    pred_out = Path(args.pred_out) if args.pred_out else (out_root / "pred_topk.jsonl")
++
++    adapter_version = "setrec_v3_full_multitarget_20260228"
++    adapter_version_file = processed_dir / "setrec_adapter_version.txt"
++    cached_version = adapter_version_file.read_text().strip() if adapter_version_file.exists() else ""
++    version_ok = cached_version == adapter_version
++
++    train_instances_prefix = str(processed_dir / "train_instances")
++    val_instances_file = str(processed_dir / "validation_instances")
++    test_instances_file = str(processed_dir / "test_instances")
++
++    val_users_file = processed_dir / "validation_users.npy"
++    test_users_file = processed_dir / "test_users.npy"
++
++    his_maxtix_file = str(processed_dir / "his_maxtix.pt")
++    labels_file = str(processed_dir / "labels.pt")
++
++    train_dict: dict[int, list[int]] = np.load(domain_dir / "training_dict.npy", allow_pickle=True).item()
++    val_dict: dict[int, list[int]] = np.load(domain_dir / "validation_dict.npy", allow_pickle=True).item()
++    test_dict: dict[int, list[int]] = np.load(domain_dir / "testing_dict.npy", allow_pickle=True).item()
++
++    user_num = len(train_dict)
++
++    sem_emb_path = domain_dir / f"{args.domain}.emb-t5-tdcb.npy"
++    sem_emb = np.load(sem_emb_path, mmap_mode="r")
++    item_num = int(sem_emb.shape[0])
++
++    need_train_parts = [Path(f"{train_instances_prefix}_{i}") for i in range(args.train_sample_seg_cnt)]
++    need_aux = [Path(val_instances_file), Path(test_instances_file), val_users_file, test_users_file]
++    if (not version_ok) or args.force_regen or (not all(p.exists() for p in need_train_parts)) or (not all(p.exists() for p in need_aux)):
++        print("[EAGER][SETRec] generating instances (FULL multi-target protocol)...")
++
++        total_users = len(train_dict)
++        val_nonempty = sum(1 for u in train_dict if len(val_dict.get(u, [])) > 0)
++        test_nonempty = sum(1 for u in train_dict if len(test_dict.get(u, [])) > 0)
++        print(f"[EAGER][SETRec] split stats: users_total={total_users} val_nonempty={val_nonempty} test_nonempty={test_nonempty}")
++
++        train_sample = build_sample_from_user_seqs(train_dict)
++        _gen_train_sample(
++            train_sample,
++            train_instances_prefix,
++            train_sample_seg_cnt=args.train_sample_seg_cnt,
++            parall=args.parall,
++            seq_len=args.seq_len,
++            min_seq_len=args.min_seq_len,
++        )
++
++        history_len = args.seq_len - 1
++
++        val_histories = {u: train_dict[u] for u in train_dict}
++        val_labels = {u: val_dict.get(u, []) for u in train_dict}
++        val_users = write_instances_file(
++            Path(val_instances_file),
++            val_histories,
++            val_labels,
++            history_len=history_len,
++            include_only_nonempty_labels=True,
++        )
++        np.save(val_users_file, np.asarray(val_users, dtype=np.int64))
++
++        test_histories = {u: train_dict[u] + val_dict.get(u, []) for u in train_dict}
++        test_labels = {u: test_dict.get(u, []) for u in train_dict}
++        test_users = write_instances_file(
++            Path(test_instances_file),
++            test_histories,
++            test_labels,
++            history_len=history_len,
++            include_only_nonempty_labels=True,
++        )
++        np.save(test_users_file, np.asarray(test_users, dtype=np.int64))
++
++        adapter_version_file.write_text(adapter_version)
++
++    train_instances = Train_instance(parall=args.parall)
++    training_data, training_labels = train_instances.get_training_data(
++        train_instances_prefix,
++        args.train_sample_seg_cnt,
++        item_num,
++        his_maxtix_file,
++        labels_file,
++    )
++
++    val_instances = train_instances.read_validation_instances_file(val_instances_file, item_num)
++    test_instances = train_instances.read_test_instances_file(test_instances_file, item_num)
++
++    val_users = np.load(val_users_file)
++    test_users = np.load(test_users_file)
++
++    print(
++        "[EAGER][SETRec] users", user_num,
++        "items", item_num,
++        "train_records", int(training_data.shape[0]),
++        "val_users", int(val_instances.shape[0]),
++        "test_users", int(test_instances.shape[0]),
++    )
++
++    import pickle
++
++    with open(domain_dir / "SASRec_item_embed.pkl", "rb") as f:
++        beh_emb = pickle.load(f)
++    if not isinstance(beh_emb, torch.Tensor):
++        raise TypeError(f"Unexpected SASRec_item_embed.pkl type: {type(beh_emb)}")
++    beh_emb = beh_emb[:item_num].float().cpu()
++
++    sem_emb_t = torch.from_numpy(np.asarray(sem_emb)).float().cpu()
++
++    data_cpu = [beh_emb, sem_emb_t]
++    type_list = [0, 1]
++    feat_dim = [int(beh_emb.shape[1]), int(sem_emb_t.shape[1])]
++
++    dec_num_layers = [int(x) for x in args.dec_num_layers.split(",")]
++    if len(dec_num_layers) != args.tree_num:
++        raise ValueError("--dec_num_layers must have tree_num entries")
++
++    init_way = [x.strip() for x in args.init_way.split(",")]
++    if len(init_way) != args.tree_num:
++        raise ValueError("--init_way must have tree_num entries")
++
++    item_to_code_file_list = []
++    code_to_item_file_list = []
++    tree_has_generated_list = []
++    for tree_id in range(args.tree_num):
++        item_to_code_file = processed_dir / f"item_to_code_tree{tree_id}_k{args.k}.npy"
++        code_to_item_file = processed_dir / f"code_to_item_tree{tree_id}_k{args.k}.npy"
++        item_to_code_file_list.append(str(item_to_code_file))
++        code_to_item_file_list.append(str(code_to_item_file))
++        tree_has_generated_list.append(item_to_code_file.exists() and code_to_item_file.exists())
++
++    train_model_list = []
++    for i in range(args.tree_num):
++        train_model = Trm4Rec(
++            item_num=item_num,
++            user_seq_len=args.seq_len - 1,
++            d_model=args.d_model,
++            d_model2=feat_dim[i],
++            nhead=args.n_head,
++            device="cuda",
++            enc_num_layers=args.enc_num_layers,
++            dec_num_layers=dec_num_layers[i],
++            k=args.k,
++            item_to_code_file=item_to_code_file_list[i],
++            code_to_item_file=code_to_item_file_list[i],
++            tree_has_generated=tree_has_generated_list[i],
++            init_way=init_way[i],
++            max_iters=args.max_iters,
++            feature_ratio=args.feature_ratio,
++            data=data_cpu[i],
++            parall=args.parall,
++            type=type_list[i],
++        )
++        if i > 0:
++            train_model.trm_model.trm.encoder = train_model_list[0].trm_model.trm.encoder
++        train_model_list.append(train_model)
++
++    data_gpu = [d.to("cuda", non_blocking=True) for d in data_cpu]
++
++    opt_args = {
++        "lr": args.lr,
++        "weight_decay": args.weight_decay,
++        "warmup_updates": args.warmup_updates,
++        "warmup_init_lr": args.warmup_init_lr,
++    }
++
++    model_parameters = list(train_model_list[0].trm_model.trm.encoder.parameters())
++    for i in range(args.tree_num):
++        model_parameters += list(train_model_list[i].trm_model.trm.decoder.parameters())
++        model_parameters += list(train_model_list[i].trm_model.fc_proj1.parameters())
++        model_parameters += list(train_model_list[i].trm_model.guide_proj.parameters())
++        model_parameters += list(train_model_list[i].trm_model.trans_d_rec.parameters())
++        model_parameters += list(train_model_list[i].trm_model.fc_comp.parameters())
++        model_parameters += [train_model_list[i].trm_model.start_vec]
++        model_parameters += [train_model_list[i].trm_model.mask_vec]
++
++    model_optimizer = AdamOptimizer(opt_args, model_parameters)
++    lr_scheduler = InverseSquareRootSchedule(opt_args, model_optimizer)
++
++    for i in range(args.tree_num):
++        train_model_list[i].trm_model.train()
++
++    eval_batch_size = 50
++    best_ndcg10 = -1.0
++    best_path = ckpt_dir / "best.pt"
++
++    loss_history: list[float] = []
++    contra_history: list[float] = []
++
++    def eval_and_maybe_save(step: int, curr_lr: float) -> None:
++        nonlocal best_ndcg10
++
++        for i in range(args.tree_num):
++            train_model_list[i].trm_model.eval()
++
++        preds = _predict_all(
++            val_instances,
++            train_model_list,
++            type_list,
++            topk=args.eval_topk,
++            rerank_topk=args.eval_rerank_topk,
++            batch_size=eval_batch_size,
++        )
++
++        ndcg10 = None
++        metrics_parts = []
++        for k in (5, 10):
++            if args.eval_rerank_topk < k:
++                continue
++            res_k = preds[:, :k]
++            prec_k = presision(res_k, train_instances.validation_labels, k)
++            rec_k = recall(res_k, train_instances.validation_labels)
++            hr_k = hit_ratio(res_k, train_instances.validation_labels)
++            ndcg_k = ndcg_bug(res_k, train_instances.validation_labels)
++            if k == 10:
++                ndcg10 = float(ndcg_k)
++            metrics_parts.append(
++                f"P@{k}={prec_k:.4f} R@{k}={rec_k:.4f} HR@{k}={hr_k:.4f} NDCG@{k}={ndcg_k:.4f}"
++            )
++
++        metrics_str = " ".join(metrics_parts) if metrics_parts else "n/a"
++        print(
++            f"[EAGER][SETRec][{args.domain}][VAL] step={step} lr={curr_lr:.6f} "
++            f"loss={np.mean(loss_history[-100:]):.4f} contra={np.mean(contra_history[-100:]):.4f} "
++            f"{metrics_str}"
++        )
++
++        if ndcg10 is not None and ndcg10 > best_ndcg10:
++            best_ndcg10 = ndcg10
++            meta = {
++                "domain": args.domain,
++                "seed": args.seed,
++                "step": step,
++                "best_val_ndcg10": best_ndcg10,
++                "adapter_version": adapter_version,
++            }
++            _save_checkpoint(best_path, train_model_list, meta)
++            (ckpt_dir / "best_meta.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
++            print(f"[EAGER][SETRec] saved new best checkpoint: {best_path} (val_ndcg10={best_ndcg10:.6f})")
++
++        for i in range(args.tree_num):
++            train_model_list[i].trm_model.train()
++
++    for batch_x, batch_y in train_instances.generate_training_records(
++        training_data, training_labels, batch_size=args.train_batch_size
++    ):
++        loss = 0
++        contra_loss = 0
++
++        guide_feat = None
++        for i in range(args.tree_num - 1, -1, -1):
++            loss_i, contra_i, guide_feat = train_model_list[i].update_model(
++                batch_x,
++                batch_y,
++                data_gpu[i],
++                type=type_list[i],
++                use_con=False,
++                use_guide=False,
++                guide_feat=guide_feat,
++            )
++            loss += loss_i
++            contra_loss += contra_i
++
++        loss.backward()
++        model_optimizer.step()
++        curr_lr = lr_scheduler.step_update(train_model_list[0].batch_num)
++        model_optimizer.zero_grad()
++
++        loss_history.append(float(loss.detach().cpu()))
++        contra_history.append(float(contra_loss.detach().cpu()))
++
++        if train_model_list[0].batch_num % args.eval_step == 0:
++            eval_and_maybe_save(train_model_list[0].batch_num, float(curr_lr))
++
++        if train_model_list[0].batch_num >= args.total_batch_num:
++            break
++
++    final_path = ckpt_dir / "last.pt"
++    meta_last = {
++        "domain": args.domain,
++        "seed": args.seed,
++        "step": int(train_model_list[0].batch_num),
++        "best_val_ndcg10": float(best_ndcg10),
++        "adapter_version": adapter_version,
++    }
++    _save_checkpoint(final_path, train_model_list, meta_last)
++
++    if best_path.exists():
++        _load_checkpoint(best_path, train_model_list)
++        print(f"[EAGER][SETRec] loaded best checkpoint for export: {best_path}")
++    else:
++        print("[EAGER][SETRec] WARNING: best checkpoint not found; exporting with last weights")
++
++    for i in range(args.tree_num):
++        train_model_list[i].trm_model.eval()
++
++    preds_test = _predict_all(
++        test_instances,
++        train_model_list,
++        type_list,
++        topk=args.export_topk,
++        rerank_topk=args.export_rerank_topk,
++        batch_size=eval_batch_size,
++    )
++
++    if preds_test.shape[0] != test_users.shape[0]:
++        raise RuntimeError(f"test_users mismatch: preds={preds_test.shape[0]} users={test_users.shape[0]}")
++
++    pred_out.parent.mkdir(parents=True, exist_ok=True)
++    with pred_out.open("w", encoding="utf-8") as f:
++        for u, row in zip(test_users.tolist(), preds_test.tolist()):
++            rec = {"user_id": int(u), "predicted_items": [int(x) for x in row]}
++            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
++
++    print(
++        f"[EAGER][SETRec] wrote predictions: {pred_out} "
++        f"users={int(test_users.shape[0])} k={args.export_rerank_topk}"
++    )
++
++
++if __name__ == "__main__":
++    main()

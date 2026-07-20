@@ -1,0 +1,568 @@
+{
+  "data_root": "/data/xqp_data/RecSys26/third_party/SETRec/data",
+  "datasets": {
+    "beauty": {
+      "files": [
+        {
+          "exists": true,
+          "file": "training_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:14",
+          "sha256": "d2535933ef9980c1a9f20d2bec806cb7a7f02320aa6686f0cae2a58009b933ec",
+          "size_bytes": 595058
+        },
+        {
+          "exists": true,
+          "file": "validation_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:14",
+          "sha256": "7bdb45c5ce26d8dd8d015d144864ea5acef864bf3c42c531d3ace932246407c5",
+          "size_bytes": 222699
+        },
+        {
+          "exists": true,
+          "file": "testing_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:14",
+          "sha256": "a758f109a95dd4c8368140e8179c1ea391ed1fad90e8339ddec5127dc67a0f9f",
+          "size_bytes": 225054
+        },
+        {
+          "exists": false,
+          "file": "testing_warm_dict.npy"
+        },
+        {
+          "exists": false,
+          "file": "testing_cold_dict.npy"
+        },
+        {
+          "exists": true,
+          "file": "warm_item.npy",
+          "mtime_utc": "2026-02-23 16:34:14",
+          "sha256": "acfad2ed14c90e6e844eff87b85ef6268035d0d7e33eef1b6b453e9794c84082",
+          "size_bytes": 34303
+        },
+        {
+          "exists": true,
+          "file": "cold_item.npy",
+          "mtime_utc": "2026-02-23 16:34:14",
+          "sha256": "117a25c22f10d8e8a535545672b455512cba2860be302a99a3e124a27b9d27ca",
+          "size_bytes": 2143
+        },
+        {
+          "exists": true,
+          "file": "SASRec_item_embed.pkl",
+          "mtime_utc": "2026-02-23 16:34:14",
+          "sha256": "1bad13480f62b5e401853e5a37b06cac381ddab65349fff91d603e85b59fdd75",
+          "size_bytes": 3079070
+        },
+        {
+          "exists": true,
+          "file": "combine_tdcb_maps.npy",
+          "mtime_utc": "2026-02-23 16:34:14",
+          "sha256": "d52528b6715eb74bfa6acf55eda45cb7401bcd88f0592e6bda63f30e21223167",
+          "size_bytes": 7814384
+        },
+        {
+          "exists": true,
+          "file": "beauty.emb-t5-tdcb.npy",
+          "mtime_utc": "2026-02-23 16:34:14",
+          "sha256": "cf0bb9f41ff54ae3953399fd27c861ca9c8ec61fa5b61f19b5b9214f0d967500",
+          "size_bytes": 36937856
+        }
+      ],
+      "split_stats": {
+        "test": {
+          "interactions_total": 17579,
+          "item_max": 12021,
+          "item_min": 1,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 57.0,
+            "mean": 2.73645703611457,
+            "median": 2.0,
+            "min": 1.0,
+            "p95": 7.0,
+            "p99": 16.0
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 18135,
+          "uid_min": 0,
+          "unique_items": 6126,
+          "users_nonempty": 6424,
+          "users_total": 18136
+        },
+        "train": {
+          "interactions_total": 132990,
+          "item_max": 12023,
+          "item_min": 0,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 174.0,
+            "mean": 7.332928981032201,
+            "median": 6.0,
+            "min": 2.0,
+            "p95": 17.0,
+            "p99": 37.0
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 18135,
+          "uid_min": 0,
+          "unique_items": 11407,
+          "users_nonempty": 18136,
+          "users_total": 18136
+        },
+        "val": {
+          "interactions_total": 16641,
+          "item_max": 12023,
+          "item_min": 9,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 46.0,
+            "mean": 2.490049379021398,
+            "median": 2.0,
+            "min": 1.0,
+            "p95": 6.0,
+            "p99": 13.0
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 18135,
+          "uid_min": 0,
+          "unique_items": 6466,
+          "users_nonempty": 6683,
+          "users_total": 18136
+        }
+      },
+      "warm_cold": {
+        "cold_unique": 617,
+        "overlap": 0,
+        "union": 12024,
+        "warm_unique": 11407
+      }
+    },
+    "sports": {
+      "files": [
+        {
+          "exists": true,
+          "file": "training_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "d96800eb5905736767b9935670d60155b209a17873b43aa52cf3120ab7bb7a94",
+          "size_bytes": 830305
+        },
+        {
+          "exists": true,
+          "file": "validation_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "8003a5f96e61ec50193fb3b77d3a5075b2900842053eb491d7eea1302167a125",
+          "size_bytes": 358438
+        },
+        {
+          "exists": true,
+          "file": "testing_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "7d00c5cc92b2047330d5aa87daec4482e1f5dfa168b246ab9b3e164475ed43c8",
+          "size_bytes": 361829
+        },
+        {
+          "exists": true,
+          "file": "testing_warm_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "b21a128ea71c627bbed06a73773f144d9e2ed704dcfdf2cfd7c5b9c59eccd0c4",
+          "size_bytes": 345749
+        },
+        {
+          "exists": true,
+          "file": "testing_cold_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "1626eca14b8a5e3bace36927cc32abc8e29625b031ebc6cc88785cc78e97193a",
+          "size_bytes": 265371
+        },
+        {
+          "exists": true,
+          "file": "warm_item.npy",
+          "mtime_utc": "2026-02-25 19:22:51",
+          "sha256": "daf0ad7073d81ee2c8f94d4bb86e10c73f265f27d772363819f3fb88c06d39f2",
+          "size_bytes": 52204
+        },
+        {
+          "exists": true,
+          "file": "cold_item.npy",
+          "mtime_utc": "2026-02-25 19:22:51",
+          "sha256": "9c5e52413a696b7a2d732eb2c69417e0573bf5d86b352d1be9ad1e2b67cb46ee",
+          "size_bytes": 3202
+        },
+        {
+          "exists": true,
+          "file": "SASRec_item_embed.pkl",
+          "mtime_utc": "2026-02-23 16:34:14",
+          "sha256": "7ee43b780e6b7ab07dd8311036de0f0f618b415ef6c56d3b5111275a7cb6d28a",
+          "size_bytes": 4695966
+        },
+        {
+          "exists": true,
+          "file": "combine_tdcb_maps.npy",
+          "mtime_utc": "2026-02-23 16:34:14",
+          "sha256": "f0f5b35f9ce2daf32995aeafcf5fa26ccf89b2cb8eff600ab9c007901f85d0c3",
+          "size_bytes": 13924808
+        },
+        {
+          "exists": true,
+          "file": "sports.emb-t5-tdcb.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "c6c6134faf1c936c494dd0e52e0c4f82eacde2f81e03f8b4915d18f4c1038181",
+          "size_bytes": 56340608
+        }
+      ],
+      "split_stats": {
+        "test": {
+          "interactions_total": 31989,
+          "item_max": 18337,
+          "item_min": 2,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 99.0,
+            "mean": 2.771049896049896,
+            "median": 2.0,
+            "min": 1.0,
+            "p95": 8.0,
+            "p99": 14.0
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 27590,
+          "uid_min": 0,
+          "unique_items": 11243,
+          "users_nonempty": 11544,
+          "users_total": 27591
+        },
+        "train": {
+          "interactions_total": 176605,
+          "item_max": 18339,
+          "item_min": 0,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 261.0,
+            "mean": 6.40081910768004,
+            "median": 5.0,
+            "min": 2.0,
+            "p95": 14.0,
+            "p99": 26.0
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 27590,
+          "uid_min": 0,
+          "unique_items": 17370,
+          "users_nonempty": 27591,
+          "users_total": 27591
+        },
+        "val": {
+          "interactions_total": 30901,
+          "item_max": 18338,
+          "item_min": 2,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 55.0,
+            "mean": 2.678425933951634,
+            "median": 2.0,
+            "min": 1.0,
+            "p95": 7.0,
+            "p99": 13.0
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 27590,
+          "uid_min": 0,
+          "unique_items": 11516,
+          "users_nonempty": 11537,
+          "users_total": 27591
+        }
+      },
+      "warm_cold": {
+        "cold_unique": 970,
+        "overlap": 0,
+        "union": 18340,
+        "warm_unique": 17370
+      }
+    },
+    "steam": {
+      "files": [
+        {
+          "exists": true,
+          "file": "training_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "0bdccb0a11c416c79a3265bc76ba3fe5b14b56733c9207310eef86912cefc036",
+          "size_bytes": 3782050
+        },
+        {
+          "exists": true,
+          "file": "validation_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "74d36bb0bf947e076ad5be63a6d8dca21084b5ff8e8bed6a65080ece0d95b5b6",
+          "size_bytes": 774341
+        },
+        {
+          "exists": true,
+          "file": "testing_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "aa59f41bdd2f45fd9891e770f8a66f1be3387977b8a4a74856fc66ebcba0e9f2",
+          "size_bytes": 765619
+        },
+        {
+          "exists": true,
+          "file": "testing_warm_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "363f1ab92e2b9617e0a9bbf11125b0d01ad03169ada712ecac657d9ef02c57f2",
+          "size_bytes": 624133
+        },
+        {
+          "exists": true,
+          "file": "testing_cold_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "d99034e54ce022e8792cdc452068242bf472345a3eb98e9a6bcf2de838eeba19",
+          "size_bytes": 457142
+        },
+        {
+          "exists": true,
+          "file": "warm_item.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "f6fd465f6558160bb18f34d914a17d4124fc3fccfd8b5d6999bb62396b7fc115",
+          "size_bytes": 33352
+        },
+        {
+          "exists": true,
+          "file": "cold_item.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "3dd33d843b1df9b13d51ef3d35b217059952c5ac7d234f7919a8ee32d3261f47",
+          "size_bytes": 10018
+        },
+        {
+          "exists": true,
+          "file": "SASRec_item_embed.pkl",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "b5993eb0747d28e0301679429ba1522f1d4acc8dd9a29f16b6a2dbf9b15d7fb2",
+          "size_bytes": 3669406
+        },
+        {
+          "exists": true,
+          "file": "combine_tdcb_maps.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "600959b75fda3dc0a4d6ccd7781153768878d8d073b303070de03f90dd213d4d",
+          "size_bytes": 4461000
+        },
+        {
+          "exists": true,
+          "file": "steam.emb-t5-tdcb.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "e42be58fb72146a0fd0516b4aaade17f4cdab52382a017b03f1f6462232a1635",
+          "size_bytes": 44021888
+        }
+      ],
+      "split_stats": {
+        "test": {
+          "interactions_total": 142947,
+          "item_max": 14329,
+          "item_min": 0,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 503.0,
+            "mean": 5.753552022539746,
+            "median": 3.0,
+            "min": 1.0,
+            "p95": 18.0,
+            "p99": 38.0
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 32918,
+          "uid_min": 0,
+          "unique_items": 9876,
+          "users_nonempty": 24845,
+          "users_total": 32919
+        },
+        "train": {
+          "interactions_total": 1147583,
+          "item_max": 14329,
+          "item_min": 0,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 1042.0,
+            "mean": 34.86080986664236,
+            "median": 25.0,
+            "min": 2.0,
+            "p95": 89.0,
+            "p99": 190.8199999999997
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 32918,
+          "uid_min": 0,
+          "unique_items": 11073,
+          "users_nonempty": 32919,
+          "users_total": 32919
+        },
+        "val": {
+          "interactions_total": 145700,
+          "item_max": 14329,
+          "item_min": 0,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 517.0,
+            "mean": 5.8036247759410475,
+            "median": 3.0,
+            "min": 1.0,
+            "p95": 18.0,
+            "p99": 36.0
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 32918,
+          "uid_min": 0,
+          "unique_items": 9553,
+          "users_nonempty": 25105,
+          "users_total": 32919
+        }
+      },
+      "warm_cold": {
+        "cold_unique": 3257,
+        "overlap": 0,
+        "union": 14330,
+        "warm_unique": 11073
+      }
+    },
+    "toys": {
+      "files": [
+        {
+          "exists": true,
+          "file": "training_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "27ee06042108dd20e8d6a17728c63b442fc2f60f146f0fbaed37e2e69245f3a0",
+          "size_bytes": 513723
+        },
+        {
+          "exists": true,
+          "file": "validation_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "15820f7c2de6cf0e538431fe3dbbdc4494b1c1ccaebe1ec788b4046f0a53fb43",
+          "size_bytes": 185825
+        },
+        {
+          "exists": true,
+          "file": "testing_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "dabbdcae37245697d6543364650ceac773bad9875fcbba8c7874e5392a04a2da",
+          "size_bytes": 193020
+        },
+        {
+          "exists": true,
+          "file": "testing_warm_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "4c4eeee54ef981fb155a906d3535edc0323783b50d84c9fcf5524b6368cdee6f",
+          "size_bytes": 178395
+        },
+        {
+          "exists": true,
+          "file": "testing_cold_dict.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "c552bf7710b549ff07bfc535568bb76075b4e8dd04a145a2c476343b6b1a8247",
+          "size_bytes": 155621
+        },
+        {
+          "exists": true,
+          "file": "warm_item.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "8944f7fc0cd14d88230aca971b8f2a44db47c3ee6b8dcc679d1ecc1b8850e960",
+          "size_bytes": 33944
+        },
+        {
+          "exists": true,
+          "file": "cold_item.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "7709380a76b2c9ed41319052f96aacbf17509b75c6a25e806238b80af36227e4",
+          "size_bytes": 2154
+        },
+        {
+          "exists": true,
+          "file": "SASRec_item_embed.pkl",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "913cfd1a063c3e2c5b0c6ba757b5edb8f10c21a69bdb5faad52bcd7fa2a47f0b",
+          "size_bytes": 3049374
+        },
+        {
+          "exists": true,
+          "file": "combine_tdcb_maps.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "7e49fc2b7df3a62807084c4eae7cef21a99da81502d9774037921f73d60e8d71",
+          "size_bytes": 7754253
+        },
+        {
+          "exists": true,
+          "file": "toys.emb-t5-tdcb.npy",
+          "mtime_utc": "2026-02-23 16:34:15",
+          "sha256": "4b600b439a793040406ad453fb034df3ef476f43855130fe8209cb1eb0c879d2",
+          "size_bytes": 36581504
+        }
+      ],
+      "split_stats": {
+        "test": {
+          "interactions_total": 14776,
+          "item_max": 11907,
+          "item_min": 1,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 55.0,
+            "mean": 2.6580320201475085,
+            "median": 2.0,
+            "min": 1.0,
+            "p95": 7.0,
+            "p99": 12.0
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 15634,
+          "uid_min": 0,
+          "unique_items": 5683,
+          "users_nonempty": 5559,
+          "users_total": 15635
+        },
+        "train": {
+          "interactions_total": 114983,
+          "item_max": 11907,
+          "item_min": 0,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 550.0,
+            "mean": 7.354205308602494,
+            "median": 5.0,
+            "min": 2.0,
+            "p95": 18.0,
+            "p99": 35.659999999999854
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 15634,
+          "uid_min": 0,
+          "unique_items": 11285,
+          "users_nonempty": 15635,
+          "users_total": 15635
+        },
+        "val": {
+          "interactions_total": 12740,
+          "item_max": 11906,
+          "item_min": 1,
+          "item_nonneg": true,
+          "per_user_len": {
+            "max": 38.0,
+            "mean": 2.5680306389840757,
+            "median": 2.0,
+            "min": 1.0,
+            "p95": 7.0,
+            "p99": 12.0
+          },
+          "uid_contiguous_0_based": true,
+          "uid_max": 15634,
+          "uid_min": 0,
+          "unique_items": 5259,
+          "users_nonempty": 4961,
+          "users_total": 15635
+        }
+      },
+      "warm_cold": {
+        "cold_unique": 623,
+        "overlap": 0,
+        "union": 11908,
+        "warm_unique": 11285
+      }
+    }
+  },
+  "generated_utc": "2026-02-28T17:02:26.350747+00:00"
+}

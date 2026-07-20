@@ -645,15 +645,37 @@ def _parse_bool(value: str) -> bool:
 
 
 def _default_native_metric(name: str) -> str:
-    if name in {"I06-DiffGRM", "OPQ-L6"}:
+    if name in {"OPQ", "I06-DiffGRM", "OPQ-L6"}:
         return "hamming"
-    if name in {"I02-TIGER", "I03-SEATER", "I04-SemID", "I05-LETTER", "I07-RQKmeans"}:
+    if name in {
+        "TIGER",
+        "SEATER",
+        "HowToIndex",
+        "LETTER",
+        "RQ-Kmeans",
+        "I02-TIGER",
+        "I03-SEATER",
+        "I04-SemID",
+        "I05-LETTER",
+        "I07-RQKmeans",
+    }:
         return "prefix"
     return "hamming"
 
 
 def _default_drop_last_col(name: str) -> bool:
-    if name in {"I02-TIGER", "I03-SEATER", "I05-LETTER", "I06-DiffGRM", "I07-RQKmeans"}:
+    if name in {
+        "TIGER",
+        "SEATER",
+        "LETTER",
+        "OPQ",
+        "RQ-Kmeans",
+        "I02-TIGER",
+        "I03-SEATER",
+        "I05-LETTER",
+        "I06-DiffGRM",
+        "I07-RQKmeans",
+    }:
         return True
     return False
 
@@ -689,7 +711,7 @@ def _zscore(values: np.ndarray) -> np.ndarray:
 
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Analyze how well different semantic IDs preserve the native item geometry."
+        description="Analyze how well different semantic IDs preserve local neighborhoods in the reference item-text embedding space."
     )
     ap.add_argument("--reference_embeddings", type=Path, required=True)
     ap.add_argument("--sid", action="append", required=True, help="NAME=PATH_TO_cached_ids.npy")

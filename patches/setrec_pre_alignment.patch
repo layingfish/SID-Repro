@@ -1,0 +1,43 @@
+diff --git a/code/finetune_t5.py b/code/finetune_t5.py
+index 122e0e0..d8c5e1c 100644
+--- a/code/finetune_t5.py
++++ b/code/finetune_t5.py
+@@ -98,6 +98,14 @@ def train(args):
+         model.is_parallelizable = True
+         model.model_parallel = True
+ 
++    trainer_callbacks = []
++    if args.val_set_size > 0 and not getattr(args, 'disable_early_stopping', False):
++        trainer_callbacks = [
++            EarlyStoppingCallback(
++                early_stopping_patience=getattr(args, 'early_stopping_patience', 10)
++            )
++        ]
++
+     trainer = transformers.Trainer(
+         model=model,
+         train_dataset=dataset,
+@@ -126,7 +134,7 @@ def train(args):
+             save_safetensors=False,
+         ),
+         data_collator=data_collator,
+-        callbacks = [EarlyStoppingCallback(early_stopping_patience=10)],
++        callbacks = trainer_callbacks,
+     )
+ 
+     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
+diff --git a/code/parse_utils.py b/code/parse_utils.py
+index e29da15..eea9a78 100644
+--- a/code/parse_utils.py
++++ b/code/parse_utils.py
+@@ -15,6 +15,10 @@ def train_args(parser):
+     parser.add_argument("--warmup_steps", type=int, default=100)
+     parser.add_argument("--group_by_length", action="store_true")
+ 
++    # Trainer early stopping (setrec finetune_t5.py)
++    parser.add_argument("--early_stopping_patience", type=int, default=10)
++    parser.add_argument("--disable_early_stopping", action="store_true")
++
+     parser.add_argument("--resume_from_checkpoint", type=str, default=None) # either training checkpoint or final adapter
+     parser.add_argument("--prompt_template_name", type=str, default="template")
+ 

@@ -1,0 +1,31 @@
+diff --git a/trainer.py b/trainer.py
+index 932dcf7..02724c5 100644
+--- a/trainer.py
++++ b/trainer.py
+@@ -106,7 +106,7 @@ class Trainer(object):
+                             num_training_steps=self.max_steps // self.cycle,
+                         )
+ 
+-        self.best_score = 0
++        self.best_score = float("-inf")
+         self.best_ckpt = None
+         
+         self.model_rec, self.rec_optimizer, self.rec_lr_scheduler, \
+@@ -582,7 +582,7 @@ class Trainer(object):
+     def finetune(self, verbose=True):
+         stop = False
+         cur_eval_step = 0
+-        self.best_score = 0
++        self.best_score = float("-inf")
+         self.early_stop = 10
+         self.eval_step = 1
+         self.epochs = 100
+@@ -759,7 +759,7 @@ class Trainer(object):
+         all_item_prefix = all_item_prefix.tolist()
+ 
+         tokens2item = defaultdict(list)
+-        all_item_tokens = [[-1,-1,-1,-1]]
++        all_item_tokens = [[-1] * (self.code_length - 1) + [0]]
+         max_conflict = 0
+         for i in range(len(all_item_prefix)):
+             str_id = ' '.join(map(str, all_item_prefix[i]))

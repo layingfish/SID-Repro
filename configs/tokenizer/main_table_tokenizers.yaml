@@ -24,7 +24,7 @@ methods:
     duplicate_policy: suffix
     submitted_backbone: t5-small
 
-  T5-SemID:
+  HowToIndex:
     code: baselines/ref02
     sid_family: howtoindex_semid
     variant: semid
@@ -104,6 +104,16 @@ methods:
     tokenizer_code: baselines/ref03/RQ-VAE
     decoder: letter_lc_rec
     index_file: .index.json
+    base_model: ${MODEL_ROOT}/llama-7b
+    per_device_batch_size: 4
+    gradient_accumulation_steps: 8
+    learning_rate: 0.00002
+    epochs: 1
+    tasks: seqrec
+    train_prompt_sample_num: 1
+    train_data_sample_num: 0
+    temperature: 1.0
+    num_beams: 20
 
   SETRec:
     code: baselines/reference/code
@@ -154,6 +164,7 @@ methods:
     sid_family: two_stream_behavior_semantic_tree
     behavior_embedding: din_item_embedding
     semantic_embedding: sentence_t5_item_text
+    din_pretrain_step: 29000
     tree_num: 2
     k: 128
     d_model: 96
@@ -163,12 +174,15 @@ methods:
     init_way: [embkm, embkm]
     feature_ratio: 1.0
     max_iters: 100
+    seed: 42
     train_batch_size: 256
     total_batch_num: 60000
-    eval_step: 300
-    topk: 10
-    rerank_topk: 10
-    merge_method: confidence
+    eval_step: 3000
+    eval_topk: 10
+    eval_rerank_topk: 10
+    export_topk: 20
+    export_rerank_topk: 20
+    merge_method: sum_scores
 
   DiffGRM:
     code: baselines/ref06
@@ -187,8 +201,19 @@ methods:
     train_sliding: true
     min_hist_len: 2
     share_decoder_output_embedding: true
-    epochs: 200
-    train_batch_size: 1024
+    encoder_n_layer: 1
+    decoder_n_layer: 4
+    n_head: 4
+    n_embd: 256
+    n_inner: 1024
+    warmup_steps: 10000
+    dropout: 0.1
+    label_smoothing: 0.1
+    eval_start_epoch: 20
+    eval_interval: 1
+    patience: 15
+    epochs: 100
+    train_batch_size: 256
     eval_batch_size: 32
 
   SASRec:
@@ -197,14 +222,38 @@ methods:
     item_embedding_source: learned_from_interactions
     max_history_length: 50
     role: sequential_cf_baseline
+    epochs: 50
+    batch_size: 256
+    test_batch_size: 1024
+    random_seed: 2023
+    dataset_adapter: seater_setrec
 
   OneRec:
     code: baselines/ref05
     sid_family: rq_kmeans
     input_embedding: sentence_t5_item_text
-    codebook_size: 256
+    codebook_size: 8192
     n_layers: 3
     assignment: balanced_residual_kmeans
     max_iter: 50
+    nredo: 10
+    search_topk: 32
     seed: 42
+    code_path: baselines/ref05/onerec_v2
+    launcher: scripts/rq1_native/repro_onerec.sh
+    architecture: seq2seq
+    session_size: 5
+    max_hist: 256
+    min_hist: 3
+    batch_size: 16
+    eval_batch_size: 16
+    eval_generate_batch_size: 1
+    learning_rate: 0.0002
+    weight_decay: 0.01
+    warmup_ratio: 0.05
+    max_steps: 30000
+    eval_every: 2000
+    patience: 8
+    eval_beam_size: 128
+    eval_topk: 20
     stage2_ipa_dpo: not_used_in_main_table

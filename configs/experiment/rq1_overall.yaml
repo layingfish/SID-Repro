@@ -1,6 +1,6 @@
 rq: RQ1
 name: overall_benchmark
-question: Which SID design performs better under a unified and reproducible generative recommendation framework?
+question: Which representative SID-based generative recommendation system performs better under a unified and reproducible generative recommendation framework?
 
 protocol:
   training_and_decoding: method_native
@@ -14,7 +14,7 @@ protocol:
 
 methods:
   - TIGER
-  - T5-SemID
+  - HowToIndex
   - RPG
   - LETTER-TIGER
   - LETTER-LC-Rec
@@ -39,6 +39,9 @@ evaluation:
   strict_validation: true
   report_metrics: [Recall@5, Recall@10, NDCG@5, NDCG@10]
   warm_only_filter: [microlens_50k, amazon23_vg, yelp]
+  ground_truth: multi_target_test_items
+  cold_item_policy: remove_cold_ground_truth_items
+  empty_ground_truth_policy: exclude_user_after_warm_filter
   evaluator: pipeline.evaluation.unified_eval
   prediction_format: jsonl
   export_helpers: scripts/exports
@@ -57,7 +60,7 @@ command_templates:
     --mode full
     --data_dir ${DATA_ROOT}/setrec_data
     --top_n 5,10
-    --strict
+    --warm_only
     --output ${RUN_ROOT}/rq1/<method>/<dataset>/metrics_full.json
 
 method_pipelines:
@@ -68,7 +71,7 @@ method_pipelines:
     decoder: reference_rqvae_recommender_decoder
     config_source: baselines/decoder/configs
 
-  T5-SemID:
+  HowToIndex:
     code: baselines/ref02
     native_protocol: howtoindex_llm_recsys_id_semid
     train: main.py
@@ -91,13 +94,13 @@ method_pipelines:
     code: baselines/ref03/LETTER-LC-Rec
     native_protocol: letter_indices_plus_lc_rec_decoder
     train: lora_finetune.py
-    decode: test_ddp.py
+    decode: test_only_lc.py
 
   SETRec:
     code: baselines/reference/code
     native_protocol: setrec_t5
     train: finetune_t5.py
-    decode: inference_t5.py
+    decode: scripts/exports/export_setrec_t5_topk.py
 
   ETEGRec:
     code: baselines/ref07
@@ -121,7 +124,7 @@ method_pipelines:
     code: baselines/ref06
     native_protocol: opq_pq_sid_with_diffusion_generator
     train_and_decode: main.py
-    config_source: baselines/ref06/genrec/default.yaml
+    config_source: baselines/ref06/genrec/models/DIFF_GRM/config.yaml
 
   SASRec:
     code: baselines/ref01/model/SASREC.py
@@ -130,6 +133,9 @@ method_pipelines:
 
   OneRec:
     code: baselines/ref05
-    native_protocol: rq_kmeans_style_onerec_pipeline
-    train: python -m src.train
-    decode: python -m src.inference
+    native_protocol: rq_kmeans_style_onerec_v2_pipeline
+    train: python -m onerec_v2.train
+    decode: python -m onerec_v2.generate
+    launcher: scripts/rq1_native/repro_onerec.sh
+    code_length: 3
+    codebook_width: 8192

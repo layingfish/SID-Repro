@@ -1,0 +1,23 @@
+diff --git a/genrec/datasets/__init__.py b/genrec/datasets/__init__.py
+index 3b93f1e..f9f2729 100644
+--- a/genrec/datasets/__init__.py
++++ b/genrec/datasets/__init__.py
+@@ -5,3 +5,5 @@
+ # LICENSE file in the root directory of this source tree.
+ 
+ from genrec.datasets.AmazonReviews2014.dataset import AmazonReviews2014
++
++from genrec.datasets.SETRec.dataset import SETRec
+diff --git a/genrec/utils.py b/genrec/utils.py
+index 114ee47..2b88ff9 100644
+--- a/genrec/utils.py
++++ b/genrec/utils.py
+@@ -71,6 +71,8 @@ def get_file_name(config: dict, suffix: str = ''):
+     logfilename = "{}-{}-{}-{}{}".format(
+         config["run_id"], command_line_args, config['run_local_time'], md5, suffix
+     )
++    if len(logfilename) > 255:
++        logfilename = logfilename[:245] + logfilename[-10:]
+     return logfilename
+ 
+ 

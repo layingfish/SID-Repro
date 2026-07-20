@@ -6,7 +6,7 @@ datasets:
   primary: amazon23_vg
   auxiliary:
     - microlens_50k
-    - microlens_100k_train_50k_eval
+    - microlens_100k
 
 sid_length_scaling:
   tokenizer_config: ../tokenizer/length_scaling_tokenizers.yaml
@@ -15,19 +15,23 @@ sid_length_scaling:
   decoder_model: t5-small
   decoder_recipe: unified_tiger_no_uid_decoder
   eval_mode: full
+  eval_warm_only: true
   top_n: [5, 10]
 
 backbone_scaling:
   decoder_config: ../decoder/backbone_scaling.yaml
   model_sizes: [t5-small, t5-base, t5-large]
-  iterations: 5000
+  checkpoint_selection: validation_ndcg@10
+  max_iterations: 5000
   eval_mode: full
+  eval_warm_only: true
   top_n: [5, 10]
 
 inference_only_diagnostics:
   token_usage:
     metrics: [entropy, effective_usage_rate, gini]
     report_all_layers: true
+    grouping: method_and_sid_length
   prefix_information_gain:
     methods: [RQ-VAE, RQ-Kmeans, OPQ]
     top_n: [5, 10]

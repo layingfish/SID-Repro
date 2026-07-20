@@ -1,7 +1,11 @@
-
+#coding=utf-8
+#pylint: disable=no-member
+#pylint: disable=no-name-in-module
+#pylint: disable=import-error
 
 from tqdm import tqdm
 import torch
+import json
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
@@ -20,10 +24,15 @@ from model import *
 class Trainer(object):
 
     def __init__(self, flags_obj, cm,  dm, new_config=None):
-
-
-        self.cm = cm
-        self.dm = dm
+        """
+        Args:
+            flags_obj: arguments in main.py
+            cm : context manager
+            dm : dataset manager
+            new config : update default model config(`./config/model_kuaishou.yaml`) to tune hyper-parameters
+        """
+        self.cm = cm #context manager
+        self.dm = dm #dataset manager
         self.flags_obj = flags_obj
         self.model_name = flags_obj.model
         self.set_device()
@@ -31,7 +40,7 @@ class Trainer(object):
         self.update_model_config(new_config)
         self.lr = self.model_config['lr']
         self.set_tensorboard(flags_obj.tb)
-
+        # self.judger = judge() # calculate metrics
         self.set_model()
         self.set_dataloader()
         self.model = self.model.to(self.device)
@@ -75,26 +84,26 @@ class Trainer(object):
         if hasattr(self, 'train_dataloader'):
             return
 
-
+        # training dataloader
         self.train_dataloader = data.get_dataloader(
             data_set = getattr(data, f'{self.model_name.upper()}_Dataset')(self.dm, mode='training'),
             bs = self.dm.batch_size,
-            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else None,
+            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else 2,
             num_workers = self.dm.num_workers,
             shuffle=True
         )
-
+        # validation dataloader
         self.valid_dataloader =  data.get_dataloader(
             data_set = getattr(data, f'{self.model_name.upper()}_Dataset')(self.dm, mode='validation'),
             bs = self.dm.test_batch_size,
-            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else None,
+            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else 2,
             num_workers = self.dm.num_workers
         )
-
+        # test dataloader
         self.test_dataloader =  data.get_dataloader(
             data_set = getattr(data, f'{self.model_name.upper()}_Dataset')(self.dm, mode='test'),
             bs = self.dm.test_batch_size,
-            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else None,
+            prefetch_factor = self.dm.batch_size // self.dm.num_workers + 1 if self.dm.num_workers!=0 else 2,
             num_workers = self.dm.num_workers
         )
 
@@ -113,10 +122,10 @@ class Trainer(object):
         ckpt_path = os.path.join(self.cm.workspace, 'ckpt')
         model_path = None
         if assigned_path is not None:
-
+            '''specific assigned path'''
             model_path = assigned_path
         else:
-
+            '''default path'''
             model_path = os.path.join(ckpt_path, 'best.pth')
         self.model.load_state_dict(torch.load(model_path, map_location=self.device))
 
@@ -124,11 +133,11 @@ class Trainer(object):
 
         self.optimizer = optim.Adam(self.model.parameters(), \
                         lr=self.model_config['lr'], weight_decay=self.model_config['weight_decay'])
-        self.esm = ctxt.EarlyStopManager(self.model_config)
+        self.esm = ctxt.EarlyStopManager(self.model_config) # early-stop manager
 
-        best_metric = -1.0
-        train_loss = [0.0, 0.0, 0.0, 0.0, 0.0]
-        val_loss = [0.0]
+        best_metric = 0
+        train_loss = [0.0, 0.0, 0.0, 0.0, 0.0] #store every training loss
+        val_loss = [0.0] # store loss on validation set
 
         for epoch in range(self.flags_obj.epochs):
 
@@ -159,7 +168,7 @@ class Trainer(object):
 
             if torch.isnan(loss):
                 raise ValueError('loss is NaN!')
-
+                # print('loss is NaN!')
 
             loss.backward()
             self.optimizer.step()
@@ -179,7 +188,15 @@ class Trainer(object):
 
     @torch.no_grad()
     def evaluate(self, total_loss=None, epoch=0):
+        """Evaluate the model on validation/test data set
 
+        Args:
+            total_loss: store total loss for all epochs. only used for validation
+            epoch: number of current epoch
+
+        Returns:
+            results: dict of evaluation metrics
+        """
 
         self.model.eval()
 
@@ -193,36 +210,56 @@ class Trainer(object):
 
         else:
 
-
+            # comi_ndcg = eva(pre = group_pred_items, ground_truth = group_next_items, comi_ndcg=True)
             res = eva(pre = group_pred_items, ground_truth = group_next_items, comi_ndcg=False)
 
             return res
 
     def _run_eval(self, dataloader):
-
-
+        """
+        making prediction in full-sort setting
+        """
         topK = 50
         group_pred_logits, group_next_items, group_pred_items = [], [], []
+        group_user_ids = []  # for pred_topk.jsonl export
 
-        user_item_record = dataloader.dataset.record
+        user_item_record = dataloader.dataset.record # pd.Dataframe
 
         for batch_data in tqdm(iterable=dataloader, mininterval=1, ncols=100):
             step_uid = batch_data[0]
             batch_data = tuple(input_data.to(self.device) for input_data in batch_data)
-            step_pred_logits, step_pred_item = self._get_prediction(batch_data, topK)
+            step_pred_logits, step_pred_item = self._get_prediction(batch_data, topK) #B, topK
 
             step_next_items = \
                 user_item_record.loc[user_item_record['uid'].isin(step_uid.numpy())]\
-                ['next_item'].values
+                ['next_item'].values #np.array(list[], list[],...,list[])
 
-
+            # group_pred_logits.extend(step_pred_logits.cpu().numpy())
             group_pred_items.extend(step_pred_item.cpu().numpy())
             group_next_items.extend(step_next_items)
+            group_user_ids.extend(step_uid.numpy().tolist())
 
-
+        # cpu() results in gpu memory not auto-collected
+        # this command frees memory in Nvidia-smi
         if self.device != torch.device('cpu'):
             with torch.cuda.device(self.device):
                 torch.cuda.empty_cache()
+
+        # Export pred_topk.jsonl
+        pred_output_path = os.path.join(self.cm.workspace, 'pred_topk.jsonl')
+        with open(pred_output_path, 'w') as f:
+            for uid, preds in zip(group_user_ids, group_pred_items):
+                # SEATER item IDs = SETRec 0-based + 1; convert back
+                items_raw = preds[:20].tolist() if hasattr(preds, 'tolist') else list(preds)[:20]
+                seen = set()
+                unique = []
+                for x in items_raw:
+                    item_0based = int(x) - 1
+                    if item_0based >= 0 and item_0based not in seen:
+                        seen.add(item_0based)
+                        unique.append(item_0based)
+                f.write(json.dumps({"user_id": int(uid), "predicted_items": unique}) + '\n')
+        print(f'[EXPORT] Saved {len(group_user_ids)} users pred_topk.jsonl -> {pred_output_path}')
 
         return group_pred_items, group_next_items
 
@@ -237,7 +274,9 @@ class Trainer(object):
 
 
     def test(self, assigned_model_path = None, load_config=True):
-
+        '''
+            test model on test dataset
+        '''
 
         if load_config:
             self.load_ckpt(assigned_path = assigned_model_path)
@@ -250,7 +289,9 @@ class Trainer(object):
 
 
     def record_metrics(self, epoch, metric):
-
+        """
+        record metrics after each epoch
+        """
 
         logging.info('VALIDATION epoch: {}, results: {}'.format(epoch, metric))
         if self.writer:
@@ -259,17 +300,28 @@ class Trainer(object):
                         self.writer.add_scalar("training_metric/"+str(k), v, epoch)
 
 
+
 class Sequence_Dual_Encoder_Trainer(Trainer):
     def __init__(self, flags_obj, cm, dm, new_config=None):
         super().__init__(flags_obj, cm, dm, new_config)
 
     def _get_loss(self, sample):
-
+        '''
+        Args:
+            sample -> tuple : (user_id, user_reco_his, next_item, neg_sample_item)
+        Return:
+            loss -> torch.tensor (,)
+        '''
 
         return self.model(sample)
 
     def _get_prediction(self, sample, topK):
-
+        '''
+        Args:
+            sample -> tuple : (user_id, user_reco_his)
+        Return:
+            pred_logits, pred_item_ID: torch.tensor (Batch, topK)
+        '''
 
         return self.model.predict(sample, topK)
 
@@ -286,12 +338,18 @@ class SASREC_Trainer(Sequence_Dual_Encoder_Trainer):
             logging.info('{}: {}'.format(k, v))
 
 
+
 class SEATER_Trainer(Trainer):
     def __init__(self, flags_obj, cm, dm, new_config=None):
-
-
-        self.cm = cm
-        self.dm = dm
+        """
+        Args:
+            flags_obj: arguments in main.py
+            cm : context manager
+            dm : dataset manager
+            new config : update default model config to tune hyper-parameters
+        """
+        self.cm = cm #context manager
+        self.dm = dm #dataset manager
         self.flags_obj = flags_obj
         self.model_name = flags_obj.model
         self.set_device()
@@ -303,7 +361,7 @@ class SEATER_Trainer(Trainer):
         self.model = self.model.to(self.device)
 
     def set_model(self):
-
+        # build tree index structure
         self.dm.tree_data_par_path = os.path.join(self.dm.tree_data_par_path, f'{self.flags_obj.vocab}_branch_tree')
         if not os.path.exists(f'{self.dm.tree_data_par_path}/itemID_2_tree_indexID.npy'):
             build_hieraichical_clustering_tree(
@@ -315,7 +373,7 @@ class SEATER_Trainer(Trainer):
 
         self.set_dataloader()
 
-
+        # reset model config
         self.model_config['decoder_index']['vocab_size'] = self.flags_obj.vocab
         self.model_config['decoder_index']['tree_nodes_num'] = self.train_dataloader.dataset.tree_nodes_num
         self.model_config['decoder_index']['max_len'] = self.train_dataloader.dataset.max_len
@@ -336,12 +394,22 @@ class SEATER_Trainer(Trainer):
         self.w_sm = self.model_config['sm_weight']
 
     def _get_loss(self, sample):
-
+        '''
+        Args:
+            sample -> tuple : ( user_reco_his, next_item)
+        Return:
+            loss -> torch.tensor (,)
+        '''
 
         return self.model.train_step(sample)
 
     def _get_prediction(self, sample, topK):
-
+        '''
+        Args:
+            sample (torch.tensor) (Batch) : user_reco_his
+        Return:
+            pred_logits, pred_item_ID: torch.tensor (Batch, topK)
+        '''
 
         logits, pred_items = self.model.predict_step(sample, topK)
 
@@ -355,7 +423,7 @@ class SEATER_Trainer(Trainer):
 
         self.model.train()
         current_lr = self.optimizer.param_groups[0]['lr']
-        if current_lr < self.lr:
+        if current_lr < self.lr: #record schedular reducing lr
             self.lr = current_lr
             logging.info('reducing learning rate!')
 
@@ -399,8 +467,8 @@ class SEATER_Trainer(Trainer):
                                     epoch_rk_loss/(step+1+epoch*self.train_dataloader.__len__()), step+1+epoch*self.train_dataloader.__len__())
                     self.writer.add_scalar("sm_loss",
                                     epoch_sm_loss/(step+1+epoch*self.train_dataloader.__len__()), step+1+epoch*self.train_dataloader.__len__())
-
-
+                    # self.writer.add_scalar("temp",
+                    #                 self.model.temp.item(), step+1+epoch*self.train_dataloader.__len__())
         logging.info('epoch {}:  decode loss = {}, rk loss = {}, sm loss = {}'\
                      .format(epoch,
                              epoch_decode_loss / (step+1+epoch*self.train_dataloader.__len__()),
