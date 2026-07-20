@@ -17,7 +17,7 @@ intended to make the experimental protocol explicit and auditable.
 - `experiment/rq1_overall.yaml`: RQ1 overall benchmark protocol.
 - `experiment/rq2_codebook_usage.yaml`: RQ2 codebook-utilization protocol.
 - `experiment/rq3_scaling.yaml`: RQ3 length/backbone scaling protocol.
-- `experiment/rq4_geometry.yaml`: RQ4 neighborhood-preservation protocol.
+- `experiment/rq4_geometry.yaml`: RQ4 local-semantic-preservation protocol.
 
 RQ1 uses method-native training and decoding from the corresponding reference
 implementations. The shared part of RQ1 is the data adapter, canonical item-id

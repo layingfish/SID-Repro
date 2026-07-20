@@ -18,7 +18,8 @@ model_sizes:
     gradient_accumulate_every: 16
 
 common:
-  iterations: 5000
+  max_iterations: 5000
+  checkpoint_selection: validation_ndcg@10
   save_model_every: 5000
   learning_rate: 0.0003
   weight_decay: 0.035
@@ -30,3 +31,5 @@ common:
   export_topk_items: 20
   eval_mode: full
   eval_top_n: [5, 10]
+  eval_warm_only: true
+  eval_strict: true

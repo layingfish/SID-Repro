@@ -45,6 +45,8 @@ def train(
     save_model_every=1000000,
     partial_eval_every=1000,
     full_eval_every=10000,
+    early_stopping_metric=None,
+    early_stopping_patience=None,
     vae_input_dim=18,
     vae_embed_dim=16,
     vae_hidden_dims=[18, 18],
@@ -172,6 +174,10 @@ def train(
     metrics_accumulator = TopKAccumulator(ks=[1, 5, 10])
     num_params = sum(p.numel() for p in model.parameters())
     print(f"Device: {device}, Num Parameters: {num_params}")
+    best_metric_value = float("-inf")
+    best_metric_iter = -1
+    stale_eval_count = 0
+    stop_training = False
     with tqdm(initial=start_iter, total=start_iter + iterations,
               disable=not accelerator.is_main_process) as pbar:
         for iter in range(iterations):
@@ -239,6 +245,36 @@ def train(
                 if accelerator.is_main_process and wandb_logging:
                     wandb.log(eval_metrics)
 
+                metric_key = early_stopping_metric or f"ndcg@10_slice_:{tokenizer.sem_ids_dim}"
+                metric_value = eval_metrics.get(metric_key)
+                if metric_value is not None:
+                    improved = metric_value > best_metric_value
+                    if improved:
+                        best_metric_value = metric_value
+                        best_metric_iter = iter
+                        stale_eval_count = 0
+                        if accelerator.is_main_process:
+                            if not os.path.exists(save_dir_root):
+                                os.makedirs(save_dir_root)
+                            state = {
+                                "iter": iter,
+                                "model": model.state_dict(),
+                                "optimizer": optimizer.state_dict(),
+                                "scheduler": lr_scheduler.state_dict(),
+                                "best_metric": metric_key,
+                                "best_metric_value": best_metric_value,
+                            }
+                            torch.save(state, save_dir_root + "checkpoint_best.pt")
+                    else:
+                        stale_eval_count += 1
+                    if early_stopping_patience is not None and stale_eval_count >= early_stopping_patience:
+                        stop_training = True
+                        if accelerator.is_main_process:
+                            print(
+                                f"Early stopping at iter {iter}: "
+                                f"best {metric_key}={best_metric_value:.6f} at iter {best_metric_iter}"
+                            )
+
                 metrics_accumulator.reset()
 
             if accelerator.is_main_process:
@@ -263,6 +299,8 @@ def train(
                     })
 
             pbar.update(1)
+            if stop_training:
+                break
 
     if wandb_logging:
         wandb.finish()

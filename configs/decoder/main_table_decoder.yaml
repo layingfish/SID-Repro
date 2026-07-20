@@ -16,7 +16,8 @@ training:
   hf_model_path: ${MODEL_ROOT}/t5-small
   hf_local_files_only: true
   num_user_tokens: 0
-  iterations: 5000
+  max_iterations: 5000
+  checkpoint_selection: validation_ndcg@10
   save_model_every: 5000
   learning_rate: 0.0003
   weight_decay: 0.035
@@ -43,5 +44,6 @@ export:
 evaluation:
   mode: full
   top_n: [5, 10]
+  warm_only: true
   strict: true
   metrics: [Recall, NDCG]

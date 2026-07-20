@@ -1,0 +1,315 @@
+diff --git a/code/inference_t5.py b/code/inference_t5.py
+index 5f93332..b1f088f 100644
+--- a/code/inference_t5.py
++++ b/code/inference_t5.py
+@@ -32,10 +32,6 @@ def str2bool(v):
+         raise argparse.ArgumentTypeError('Boolean value expected.')
+ 
+ def inference(args):
+-    args.out_proj = str2bool(args.out_proj)
+-    args.detach = str2bool(args.detach)
+-    args.train_fullneg = str2bool(args.train_fullneg)
+-    args.gate = str2bool(args.gate)
+     print(torch.__version__) 
+     assert (
+         args.base_model
+@@ -83,8 +79,6 @@ def inference(args):
+         n_cf=args.n_cf,
+         n_sem=args.n_sem,
+         alpha=args.alpha,
+-        gate = args.gate,
+-        align_strength = args.align_strength,
+         inference = True,
+         **tokenizer_args,
+     )
+@@ -127,96 +121,124 @@ def inference(args):
+         cold_tensor = torch.LongTensor(cold).cuda()
+ 
+         with torch.no_grad():
+-            best_recall = 0
+-            flag = 0
+-            for beta in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]:
+-                model.beta = torch.nn.Parameter(torch.tensor([1-beta]+[beta]*args.n_sem, dtype=torch.float,requires_grad=False))
+-                print(model.beta)
+-
+-                print(f"beta: {beta} !!!") 
+-                gold_list = []
+-                pred_list = []
+-                warm_gold_list, warm_pred_list = [], []
+-                cold_gold_list, cold_pred_list = [], []
+-
+-                # get all_cf and all_sem
+-                idx_tensor = torch.arange(model.m_item, dtype=torch.long).cuda()
+-                model.all_cf = model.input_proj(model.input_embeds[0](idx_tensor+1)).unsqueeze(0) # (n_cf(1), n_item, dim)
+-
+-                if model.n_sem:
+-                    model.recon_all = model.tokenize_all()  # (n_sem, n_item, dim)
+-
+-                for u in testData:
+-                    if len(testData[u]) == 0:
+-                        continue
+-                    inputs = torch.LongTensor(testData[u][0]).cuda().unsqueeze(0) # seq, item
+-                    # inputs_mask = torch.ones(inputs.shape).cuda()
+-                    inputs_mask = torch.ones((inputs.shape[0], inputs.shape[1] * (args.n_query))).cuda()
+-                    _, ratings,_,_,_= model.predict(inputs, inputs_mask, inference=True) # ratings (bs, n_item)
+-                    
+-                    groundTruth = testData[u][1]
++            betas = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
++            weights = torch.stack(
++                [
++                    torch.tensor([1 - b] + [b] * args.n_sem, dtype=torch.float, device=warm_tensor.device)
++                    for b in betas
++                ],
++                dim=0,
++            )  # (n_beta, n_query)
++
++            # initialize beta for model.predict (will not be used for final scoring below)
++            model.beta = torch.nn.Parameter(weights[0], requires_grad=False)
++
++
++            # get all_cf and all_sem once
++            idx_tensor = torch.arange(model.m_item, dtype=torch.long, device=warm_tensor.device)
++            model.all_cf = model.input_proj(model.input_embeds[0](idx_tensor + 1)).unsqueeze(0)  # (n_cf(1), n_item, dim)
++            if model.n_sem:
++                model.recon_all = model.tokenize_all()  # (n_sem, n_item, dim)
++
++            warm_set = set(warm)
++
++            # per-beta containers
++            pred_lists = [[] for _ in betas]
++            warm_pred_lists = [[] for _ in betas]
++            cold_pred_lists = [[] for _ in betas]
++
++            gold_list = []
++            warm_gold_list = []
++            cold_gold_list = []
++
++            for u in testData:
++                if len(testData[u]) == 0:
++                    continue
++
++                inputs = torch.LongTensor(testData[u][0]).to(warm_tensor.device).unsqueeze(0)  # (1, seq_len)
++                inputs_mask = torch.ones(
++                    (inputs.shape[0], inputs.shape[1] * (args.n_query)),
++                    device=warm_tensor.device,
++                )
++
++                # compute per-query scores once; reuse for all betas
++                _, _, output, _, _, _ = model.predict(inputs, inputs_mask, inference=True, return_output=True)
++                output = output[:, 0, :]  # (n_query, n_item)
++
++                groundTruth = testData[u][1]
++                gold_list.append(groundTruth)
++
++                warm_gold, cold_gold = [], []
++                for item in groundTruth:
++                    if item in warm_set:
++                        warm_gold.append(item)
++                    else:
++                        cold_gold.append(item)
++                warm_gold_list.append(warm_gold)
++                cold_gold_list.append(cold_gold)
++
++                # scores: (n_beta, n_item)
++                scores = torch.sum(weights[:, :, None] * output[None, :, :], dim=1)
++
++                for i in range(scores.size(0)):
++                    ratings = scores[i]
++
+                     # all
+                     _, pred = torch.topk(ratings, k=topk[-1])
+-                    pred = pred.cpu().tolist()
+-                    gold_list.append(groundTruth)
+-                    pred_list.append(pred)
+-                    # warm and cold gold
+-                    warm_gold, cold_gold = [], []
+-                    for item in groundTruth:
+-                        if item in warm:
+-                            warm_gold.append(item)
+-                        else:
+-                            cold_gold.append(item)
+-                    warm_gold_list.append(warm_gold)
+-                    cold_gold_list.append(cold_gold)
+-
+-                    # warm pred
+-                    import copy
+-                    warm_ratings = copy.deepcopy(ratings)
+-                    warm_ratings[..., cold_tensor] = -1e16
+-                    _, pred = torch.topk(warm_ratings, k=topk[-1])
+-                    pred = pred.cpu().tolist()
+-                    warm_pred_list.append(pred)
++                    pred_lists[i].append(pred.cpu().tolist())
+ 
+-                    # cold pred
+-                    cold_ratings = copy.deepcopy(ratings)
+-                    cold_ratings[..., warm_tensor] = -1e16
++                    # warm
++                    warm_ratings = ratings.clone()
++                    warm_ratings[cold_tensor] = -1e16
++                    _, pred = torch.topk(warm_ratings, k=topk[-1])
++                    warm_pred_lists[i].append(pred.cpu().tolist())
+ 
++                    # cold
++                    cold_ratings = ratings.clone()
++                    cold_ratings[warm_tensor] = -1e16
+                     _, pred = torch.topk(cold_ratings, k=topk[-1])
+-                    pred = pred.cpu().tolist()
+-                    cold_pred_list.append(pred)
++                    cold_pred_lists[i].append(pred.cpu().tolist())
++
++            best_recall = 0
++            best_beta = None
++            best_test_results = None
++            best_warm_results = None
++            best_cold_results = None
++
++            for i, beta in enumerate(betas):
++                # keep the print format similar to the original implementation
++                print(weights[i])
++                print(f"beta: {beta} !!!")
+ 
+-                test_results = computeTopNAccuracy(gold_list, pred_list, topk)
++                test_results = computeTopNAccuracy(gold_list, pred_lists[i], topk)
+                 print("======= All performance")
+                 print_results(None, None, test_results)
+-                if test_results[1][0]>best_recall:
+-                    flag = 1
++
++                is_best = test_results[1][0] > best_recall
++                if is_best:
++                    best_recall = test_results[1][0]
+                     best_beta = beta
+                     best_test_results = test_results
+-                    best_recall = test_results[1][0]
+ 
+-                test_results = computeTopNAccuracy(warm_gold_list, warm_pred_list, topk)
++                warm_results = computeTopNAccuracy(warm_gold_list, warm_pred_lists[i], topk)
+                 print("======= Warm performance")
+-                print_results(None, None, test_results)
++                print_results(None, None, warm_results)
++                if is_best:
++                    best_warm_results = warm_results
+ 
+-                if flag:
+-                    best_warm_results = test_results
+-
+-                test_results = computeTopNAccuracy(cold_gold_list, cold_pred_list, topk)
++                cold_results = computeTopNAccuracy(cold_gold_list, cold_pred_lists[i], topk)
+                 print("======= Cold performance")
+-                print_results(None, None, test_results)
+-
+-                if flag:
+-                    best_cold_results = test_results
+-                    flag = 0
+-
+-        print(f"=== End. Best beta is {best_beta}")
+-        print("======= All performance")
+-        print_results(None, None, best_test_results)
+-        print("======= Warm performance")
+-        print_results(None, None, best_warm_results)
+-        print("======= Cold performance")
+-        print_results(None, None, best_cold_results)
++                print_results(None, None, cold_results)
++                if is_best:
++                    best_cold_results = cold_results
++
++            print(f"=== End. Best beta is {best_beta}")
++            print("======= All performance")
++            print_results(None, None, best_test_results)
++            print("======= Warm performance")
++            print_results(None, None, best_warm_results)
++            print("======= Cold performance")
++            print_results(None, None, best_cold_results)
+ 
+     del model
+ 
+diff --git a/code/model_t5.py b/code/model_t5.py
+index ab2dcac..0422bbf 100644
+--- a/code/model_t5.py
++++ b/code/model_t5.py
+@@ -160,7 +160,7 @@ class T54Rec(nn.Module):
+         return sem_input, sem_emb, recon_emb, item_sem_token
+         
+     
+-    def predict(self, inputs_id, inputs_mask, inference=False):
++    def predict(self, inputs_id, inputs_mask, inference=False, return_output=False):
+         self.batch_nonzero_mask = inputs_id!=0
+ 
+         if not inference and self.n_sem: 
+@@ -221,6 +221,8 @@ class T54Rec(nn.Module):
+             output = torch.bmm(output_emb, mat) # (n_query, bs, n_item)
+             weight = self.beta[:, None, None].to(self.t5_model.device)
+             score = torch.sum(output * weight, dim=0).squeeze()
++            if return_output:
++                return outputs, score, output, x, unique_sem_emb, x_hat
+             return outputs, score, x, unique_sem_emb, x_hat
+ 
+ 
+diff --git a/code/scripts/inference_t5.sh b/code/scripts/inference_t5.sh
+index 2cd835c..83048ff 100644
+--- a/code/scripts/inference_t5.sh
++++ b/code/scripts/inference_t5.sh
+@@ -4,12 +4,11 @@ ckpt=${3}
+ n_query=$((n_sem + 1))
+ n_cf=1
+ 
+-CUDA_VISIBLE_DEVICES=0 python inference_t5.py \
+-    --base_model /your/path/to/t5 \
++CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0} python inference_t5.py \
++    --base_model ${SETREC_T5_BASE_MODEL:-t5-small} \
+     --ckpt_dir ${ckpt} \
+     --sem_encoder t5 \
+     --data_path ../data/${dataset}/ \
+-    --task_type sequential \
+     --n_query ${n_query} \
+     --n_sem ${n_sem} \
+     --n_cf ${n_cf} \
+diff --git a/code/scripts/train_t5.sh b/code/scripts/train_t5.sh
+index 33c5ce6..b32b693 100644
+--- a/code/scripts/train_t5.sh
++++ b/code/scripts/train_t5.sh
+@@ -7,11 +7,19 @@ n_cf=1
+ seed=42
+ AE_layers="512 256 128"
+ 
+-suffix=SETRec-${lr}lr-${n_query}q-${n_sem}sem-${alpha}a-${AE}layers-${seed}seed
+-logfile=../log/t5/${dataset}/${suffix}.log # make sure root path for log exists (../log/T5/${dataset})
++suffix=SETRec-${lr}lr-${n_query}q-${n_sem}sem-${alpha}a-${seed}seed
++logdir=../log/t5/${dataset}
++mkdir -p ${logdir}
++logfile=${logdir}/${suffix}.log
+ 
+-CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc_per_node=4 --master_port=12522 finetune_t5.py \
+-    --base_model /storage/xylin/LLM4Rec/identifier/code/instruments/E4SRec/t5-small \
++GPUS=${SETREC_T5_GPUS:-0,1,2,3}
++NPROC=${SETREC_T5_NPROC:-4}
++MASTER_PORT=${SETREC_T5_MASTER_PORT:-12522}
++BASE_MODEL=${SETREC_T5_BASE_MODEL:-t5-small}
++CACHE_DIR=${SETREC_T5_CACHE_DIR:-}
++
++CMD=(torchrun --nproc_per_node=${NPROC} --master_port=${MASTER_PORT} finetune_t5.py \
++    --base_model ${BASE_MODEL} \
+     --data_path ../data/${dataset}/ \
+     --output_dir ../ckpt/t5/ \
+     --sem_encoder t5 \
+@@ -26,10 +34,14 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc_per_node=4 --master_port=12522 fin
+     --learning_rate ${lr} \
+     --cutoff_len 512 \
+     --val_set_size 2000 \
+-    --lr_scheduler 'cosine' \
++    --lr_scheduler cosine \
+     --seed ${seed} \
+-    --warmup_steps 100 \
+-    > ${logfile}
++    --warmup_steps 100)
++
++if [[ -n "${CACHE_DIR}" ]]; then
++  CMD+=(--cache_dir "${CACHE_DIR}")
++fi
++
++CUDA_VISIBLE_DEVICES=${GPUS} "${CMD[@]}" > ${logfile}
+ 
+-# example
+-# bash scripts/train_t5.sh toys 1e-3 4 0.7
+\ No newline at end of file
++echo "[OK] log: ${logfile}"

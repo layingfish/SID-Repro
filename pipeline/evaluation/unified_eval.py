@@ -86,7 +86,9 @@ def check_pbt(metrics: dict, top_n_list: list):
                 issues.append(("FAIL", f"P1: {key} is not finite: {metrics[key]}"))
 
     sorted_k = sorted(top_n_list)
-    for prefix in ("Recall", "NDCG", "HR"):
+    # Recall and HR are monotonic in K. NDCG is not generally monotonic because
+    # its ideal-DCG denominator can grow when K grows in multi-target evaluation.
+    for prefix in ("Recall", "HR"):
         for i in range(len(sorted_k) - 1):
             k1, k2 = sorted_k[i], sorted_k[i + 1]
             v1 = metrics.get(f"{prefix}@{k1}", 0)

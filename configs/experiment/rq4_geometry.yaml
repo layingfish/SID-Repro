@@ -1,6 +1,6 @@
 rq: RQ4
-name: sid_geometry
-question: How do different semantic ID designs affect the learning of item semantics?
+name: local_semantic_preservation
+question: How do different semantic ID designs affect local item semantic preservation?
 
 reference_space:
   embedding_file: ${DATA_ROOT}/setrec_data/amazon23_vg/amazon23_vg.emb-t5-tdcb.npy
@@ -8,12 +8,12 @@ reference_space:
   distance: cosine
 
 sid_inputs:
-  TIGER: ${TOKENIZER_ROOT}/I02-TIGER.cached_ids.npy
-  SEATER: ${TOKENIZER_ROOT}/I03-SEATER.cached_ids.npy
-  HowToIndex: ${TOKENIZER_ROOT}/I04-SemID.cached_ids.npy
-  LETTER: ${TOKENIZER_ROOT}/I05-LETTER.cached_ids.npy
-  OPQ: ${TOKENIZER_ROOT}/I06-DiffGRM.cached_ids.npy
-  RQ-Kmeans: ${TOKENIZER_ROOT}/I07-RQKmeans.cached_ids.npy
+  TIGER: ${TOKENIZER_ROOT}/TIGER/cached_ids.npy
+  SEATER: ${TOKENIZER_ROOT}/SEATER/cached_ids.npy
+  HowToIndex: ${TOKENIZER_ROOT}/HowToIndex/cached_ids.npy
+  LETTER: ${TOKENIZER_ROOT}/LETTER/cached_ids.npy
+  OPQ: ${TOKENIZER_ROOT}/OPQ/cached_ids.npy
+  RQ-Kmeans: ${TOKENIZER_ROOT}/RQ-Kmeans/cached_ids.npy
 
 distance_metrics:
   native:
@@ -30,6 +30,7 @@ distance_metrics:
     LETTER: true
     OPQ: true
     RQ-Kmeans: true
+  dedup_suffix_policy: ignored_for_semantic_distance_when_present
 
 main_metrics:
   neighbors_k: 20
@@ -49,23 +50,24 @@ case_study:
   plot_anchor_item_ids: [18089]
   plot_context_k: 120
   plot_font_scale: 2.0
+  output_formats: [pdf, png, svg]
   display_names:
-    I02-TIGER: TIGER
-    I03-SEATER: SEATER
-    I04-SemID: HowToIndex
-    I05-LETTER: LETTER
-    I06-DiffGRM: OPQ
-    I07-RQKmeans: RQ-Kmeans
+    TIGER: TIGER
+    SEATER: SEATER
+    HowToIndex: HowToIndex
+    LETTER: LETTER
+    OPQ: OPQ
+    RQ-Kmeans: RQ-Kmeans
 
 command_template: >
   bash scripts/run_rq4.sh
   --reference_embeddings ${DATA_ROOT}/setrec_data/amazon23_vg/amazon23_vg.emb-t5-tdcb.npy
-  --sid I02-TIGER=${TOKENIZER_ROOT}/I02-TIGER.cached_ids.npy
-  --sid I03-SEATER=${TOKENIZER_ROOT}/I03-SEATER.cached_ids.npy
-  --sid I04-SemID=${TOKENIZER_ROOT}/I04-SemID.cached_ids.npy
-  --sid I05-LETTER=${TOKENIZER_ROOT}/I05-LETTER.cached_ids.npy
-  --sid I06-DiffGRM=${TOKENIZER_ROOT}/I06-DiffGRM.cached_ids.npy
-  --sid I07-RQKmeans=${TOKENIZER_ROOT}/I07-RQKmeans.cached_ids.npy
+  --sid TIGER=${TOKENIZER_ROOT}/TIGER/cached_ids.npy
+  --sid SEATER=${TOKENIZER_ROOT}/SEATER/cached_ids.npy
+  --sid HowToIndex=${TOKENIZER_ROOT}/HowToIndex/cached_ids.npy
+  --sid LETTER=${TOKENIZER_ROOT}/LETTER/cached_ids.npy
+  --sid OPQ=${TOKENIZER_ROOT}/OPQ/cached_ids.npy
+  --sid RQ-Kmeans=${TOKENIZER_ROOT}/RQ-Kmeans/cached_ids.npy
   --output_dir ${OUTPUT_DIR}
   --pair_samples 100000
   --triplet_samples 50000
@@ -74,13 +76,19 @@ command_template: >
   --plot_anchors 1
   --plot_anchor_item_ids 18089
   --plot_context_k 120
-  --plot_method_order I02-TIGER,I03-SEATER,I04-SemID,I05-LETTER,I06-DiffGRM,I07-RQKmeans
-  --plot_display_name I02-TIGER=TIGER
-  --plot_display_name I03-SEATER=SEATER
-  --plot_display_name I04-SemID=HowToIndex
-  --plot_display_name I05-LETTER=LETTER
-  --plot_display_name I06-DiffGRM=OPQ
-  --plot_display_name I07-RQKmeans=RQ-Kmeans
+  --plot_method_order TIGER,SEATER,HowToIndex,LETTER,OPQ,RQ-Kmeans
   --plot_font_scale 2.0
   --paper_sid_metric native
+  --native_metric_override TIGER=prefix
+  --native_metric_override SEATER=prefix
+  --native_metric_override HowToIndex=prefix
+  --native_metric_override LETTER=prefix
+  --native_metric_override OPQ=hamming
+  --native_metric_override RQ-Kmeans=prefix
+  --drop_last_override TIGER=true
+  --drop_last_override SEATER=true
+  --drop_last_override HowToIndex=false
+  --drop_last_override LETTER=true
+  --drop_last_override OPQ=true
+  --drop_last_override RQ-Kmeans=true
   --seed 20260423

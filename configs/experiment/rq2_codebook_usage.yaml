@@ -5,24 +5,16 @@ question: Which SID design has the best codebook utilization and does that lead 
 inputs:
   cached_ids: ${TOKENIZER_ROOT}/${method}/cached_ids.npy
   index_json: ${TOKENIZER_ROOT}/${method}/index.json
+  dataset: amazon23_vg
+  codebook_size_per_level: [256, 256, 256]
 
 metrics:
-  per_layer:
+  paper_table:
     - used_tokens
-    - dead_tokens
-    - usage_rate
+  diagnostics:
     - entropy
-    - normalized_entropy
-    - effective_tokens
     - effective_usage_rate
     - gini
-    - top1_mass
-    - top5_mass
-  collision:
-    - unique_full_codes
-    - collision_rate
-    - max_collision_group
-    - singleton_ratio
 
 method_metadata:
   TIGER:
@@ -33,29 +25,31 @@ method_metadata:
     embedding_dim: 768
     balanced_assignment: false
     dedup_suffix: true
-  LETTER:
+  LETTER-div:
     method_family: LETTER
-    paper_variant: LETTER
-    implementation_variant: cf_loss_diversity
+    paper_variant: LETTER-div
+    implementation_variant: cf_loss_with_diversity_regularization
     embedding_source: sentence-t5-base + SASRec-CF
     embedding_dim: 768
-    balanced_assignment: true
+    balanced_assignment: false
+    diversity_regularization: true
+    dedup_suffix: true
+  LETTER-no-div:
+    method_family: LETTER
+    paper_variant: LETTER-no-div
+    implementation_variant: cf_loss_without_diversity_regularization
+    embedding_source: sentence-t5-base + SASRec-CF
+    embedding_dim: 768
+    balanced_assignment: false
+    diversity_regularization: false
     dedup_suffix: true
   RQ-Kmeans:
     method_family: RQ-Kmeans
-    paper_variant: OneRec
+    paper_variant: RQ-Kmeans
     implementation_variant: balanced_residual_kmeans
     embedding_source: sentence-t5-base
     embedding_dim: 768
     balanced_assignment: true
-    dedup_suffix: true
-  OPQ:
-    method_family: OPQ
-    paper_variant: RPG_or_DiffGRM
-    implementation_variant: faiss_opq_pq
-    embedding_source: sentence-t5-base
-    embedding_dim: 768
-    balanced_assignment: false
     dedup_suffix: true
 
 command_template: >
@@ -68,3 +62,8 @@ command_template: >
   --embedding_source ${EMBEDDING_SOURCE}
   --embedding_dim ${EMBEDDING_DIM}
   --codebook_sizes 256,256,256
+  --dedup_suffix
+
+optional_flags:
+  RQ-Kmeans:
+    - --balanced_assignment

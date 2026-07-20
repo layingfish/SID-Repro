@@ -1,0 +1,374 @@
+diff --git a/genrec/datasets/SETRec/config.yaml b/genrec/datasets/SETRec/config.yaml
+new file mode 100644
+index 0000000..a3adf85
+--- /dev/null
++++ b/genrec/datasets/SETRec/config.yaml
+@@ -0,0 +1,4 @@
++category: beauty
++metadata: sentence
++split: leave_one_out
++setrec_data_root: /data/xqp_data/RecSys26/datasets/setrec_data
+diff --git a/genrec/datasets/SETRec/dataset.py b/genrec/datasets/SETRec/dataset.py
+new file mode 100644
+index 0000000..1676a98
+--- /dev/null
++++ b/genrec/datasets/SETRec/dataset.py
+@@ -0,0 +1,176 @@
++# Copyright (c) Meta Platforms, Inc. and affiliates.
++# All rights reserved.
++
++# This source code is licensed under the license found in the
++# LICENSE file in the root directory of this source tree.
++
++import json
++import os
++
++import numpy as np
++
++from genrec.dataset import AbstractDataset
++
++
++class SETRec(AbstractDataset):
++    def __init__(self, config: dict):
++        super(SETRec, self).__init__(config)
++
++        self.category = config.get("category", "beauty")
++        self._check_available_category()
++        self.log(f"[DATASET] SETRec for domain: {self.category}")
++
++        self.setrec_root = config.get(
++            "setrec_data_root",
++            config.get("setrec_root", "/data/xqp_data/RecSys26/datasets/setrec_data"),
++        )
++        self.cache_dir = os.path.join(config["cache_dir"], "SETRec", self.category)
++        self._download_and_process_raw()
++
++    def _check_available_category(self):
++        available_categories = ["beauty", "toys", "sports", "steam"]
++        assert self.category in available_categories, (
++            f"Category \"{self.category}\" not available. "
++            f"Available categories: {available_categories}"
++        )
++
++    def _load_processed(self, processed_dir: str) -> bool:
++        seq_file = os.path.join(processed_dir, "all_item_seqs.json")
++        id_mapping_file = os.path.join(processed_dir, "id_mapping.json")
++        meta_file = os.path.join(processed_dir, "metadata.sentence.json")
++
++        if not (os.path.exists(seq_file) and os.path.exists(id_mapping_file) and os.path.exists(meta_file)):
++            return False
++
++        with open(seq_file, "r", encoding="utf-8") as f:
++            self.all_item_seqs = json.load(f)
++        with open(id_mapping_file, "r", encoding="utf-8") as f:
++            self.id_mapping = json.load(f)
++        with open(meta_file, "r", encoding="utf-8") as f:
++            self.item2meta = json.load(f)
++        return True
++
++    def _ensure_sent_emb(self, processed_dir: str) -> None:
++        sent_emb_model = self.config.get("sent_emb_model", "setrec_t5_tdcb")
++        model_basename = os.path.basename(sent_emb_model)
++        sent_emb_dim = int(self.config.get("sent_emb_dim", 768))
++        raw_path = os.path.join(processed_dir, f"{model_basename}_raw_d{sent_emb_dim}.sent_emb")
++
++        if os.path.exists(raw_path):
++            return
++
++        domain_dir = os.path.join(self.setrec_root, self.category)
++        emb_npy = os.path.join(domain_dir, f"{self.category}.emb-t5-tdcb.npy")
++        emb = np.load(emb_npy).astype(np.float32, copy=False)
++        if emb.ndim != 2:
++            raise ValueError(f"Unexpected embedding shape: {emb.shape}")
++        if emb.shape[1] != sent_emb_dim:
++            raise ValueError(
++                f"sent_emb_dim mismatch: file {emb.shape[1]} vs config {sent_emb_dim}"
++            )
++        emb.tofile(raw_path)
++        self.log(f"[DATASET] Wrote precomputed sentence embeddings to {raw_path}")
++
++    def _download_and_process_raw(self):
++        processed_dir = os.path.join(self.cache_dir, "processed")
++        os.makedirs(processed_dir, exist_ok=True)
++
++        if self._load_processed(processed_dir):
++            self._ensure_sent_emb(processed_dir)
++            return
++
++        domain_dir = os.path.join(self.setrec_root, self.category)
++        train_dict = np.load(
++            os.path.join(domain_dir, "training_dict.npy"), allow_pickle=True
++        ).item()
++        val_dict = np.load(
++            os.path.join(domain_dir, "validation_dict.npy"), allow_pickle=True
++        ).item()
++        test_dict = np.load(
++            os.path.join(domain_dir, "testing_dict.npy"), allow_pickle=True
++        ).item()
++
++        emb_npy = os.path.join(domain_dir, f"{self.category}.emb-t5-tdcb.npy")
++        emb = np.load(emb_npy, mmap_mode="r")
++        n_items = int(emb.shape[0])
++
++        self.id_mapping = {
++            "user2id": {"[PAD]": 0},
++            "item2id": {"[PAD]": 0},
++            "id2user": ["[PAD]"],
++            "id2item": ["[PAD]"],
++        }
++
++        for i in range(n_items):
++            tok = f"I{i}"
++            self.id_mapping["item2id"][tok] = i + 1
++            self.id_mapping["id2item"].append(tok)
++
++        def _to_list(x):
++            if x is None:
++                return []
++            if isinstance(x, np.ndarray):
++                x = x.tolist()
++            if isinstance(x, list):
++                return x
++            return [x]
++
++        # Build sequences for ALL users with non-empty test items.
++        # We need two held-out targets for leave-one-out splitting:
++        #   - validation target: use val[0] if available; otherwise carve the last training item
++        #   - test target: use test[0]
++        # This ensures: train split uses training items only; test history contains no test items.
++        self.all_item_seqs = {}
++        user_tokens = []
++        for u, test_seq in test_dict.items():
++            test_seq = _to_list(test_seq)
++            if len(test_seq) == 0:
++                continue
++
++            train_seq = _to_list(train_dict.get(u, []))
++            if len(train_seq) == 0:
++                continue
++
++            val_seq = _to_list(val_dict.get(u, []))
++
++            test_target = int(test_seq[0])
++
++            if len(val_seq) > 0:
++                val_target = int(val_seq[0])
++                train_used = list(map(int, train_seq))
++            else:
++                # No validation item for this user in SETRec split.
++                # Carve a pseudo-val item from the end of training to avoid dropping users.
++                train_list = list(map(int, train_seq))
++                val_target = int(train_list[-1])
++                train_used = train_list[:-1]
++
++            # Avoid degenerate case where val_target == test_target
++            if val_target == test_target and len(train_used) > 0:
++                val_target = int(train_used[-1])
++                train_used = train_used[:-1]
++
++            full = list(train_used) + [val_target, test_target]
++            user_tok = f"U{int(u)}"
++            self.all_item_seqs[user_tok] = [f"I{i}" for i in full]
++            user_tokens.append(user_tok)
++
++        user_tokens = sorted(set(user_tokens))
++        for new_uid, user_tok in enumerate(user_tokens, start=1):
++            self.id_mapping["user2id"][user_tok] = new_uid
++            self.id_mapping["id2user"].append(user_tok)
++
++        combined = np.load(
++            os.path.join(domain_dir, "combine_tdcb_maps.npy"), allow_pickle=True
++        ).item()
++        recid2combine = combined.get("recid2combine", {})
++        self.item2meta = {f"I{i}": str(recid2combine.get(i, "")) for i in range(n_items)}
++
++        with open(os.path.join(processed_dir, "all_item_seqs.json"), "w", encoding="utf-8") as f:
++            json.dump(self.all_item_seqs, f)
++        with open(os.path.join(processed_dir, "id_mapping.json"), "w", encoding="utf-8") as f:
++            json.dump(self.id_mapping, f)
++        with open(os.path.join(processed_dir, "metadata.sentence.json"), "w", encoding="utf-8") as f:
++            json.dump(self.item2meta, f, ensure_ascii=False)
++
++        self._ensure_sent_emb(processed_dir)
+diff --git a/genrec/datasets/__init__.py b/genrec/datasets/__init__.py
+index 3b93f1e..f9f2729 100644
+--- a/genrec/datasets/__init__.py
++++ b/genrec/datasets/__init__.py
+@@ -5,3 +5,5 @@
+ # LICENSE file in the root directory of this source tree.
+ 
+ from genrec.datasets.AmazonReviews2014.dataset import AmazonReviews2014
++
++from genrec.datasets.SETRec.dataset import SETRec
+diff --git a/genrec/models/DIFF_GRM/model.py b/genrec/models/DIFF_GRM/model.py
+index 390a715..807fb54 100644
+--- a/genrec/models/DIFF_GRM/model.py
++++ b/genrec/models/DIFF_GRM/model.py
+@@ -79,6 +79,10 @@ class MultiHeadAttention(nn.Module):
+             if attention_mask.dim() == 3:
+                 attention_mask = attention_mask.unsqueeze(1)  # Add head dimension
+             att = att.masked_fill(attention_mask == 0, float('-inf'))
++            # Avoid NaNs when a query position has all keys masked (all -inf).
++            all_inf = torch.isinf(att).all(dim=-1, keepdim=True)
++            if all_inf.any():
++                att = att.masked_fill(all_inf, 0.0)
+ 
+         att = F.softmax(att, dim=-1)
+         att = self.attn_dropout(att)
+diff --git a/genrec/models/DIFF_GRM/trainer.py b/genrec/models/DIFF_GRM/trainer.py
+index b7d70ef..c98ba6d 100644
+--- a/genrec/models/DIFF_GRM/trainer.py
++++ b/genrec/models/DIFF_GRM/trainer.py
+@@ -32,10 +32,9 @@ class DIFF_GRMTrainer:
+         # Use the same Accelerator created by Pipeline so logging / is_main_process stay consistent
+         self.accelerator = config.get('accelerator', None) or Accelerator()
+         
+-        # 设置保存路径
+-        self.saved_model_ckpt = os.path.join(
+-            'saved', get_file_name(config), 'pytorch_model.bin'
+-        )
++        # 设置保存路径（from-scratch：落到 config["ckpt_dir"]，便于每次 run 可审计）
++        ckpt_dir = self.config.get('ckpt_dir', 'ckpt')
++        self.saved_model_ckpt = os.path.join(ckpt_dir, 'best.bin')
+         os.makedirs(os.path.dirname(self.saved_model_ckpt), exist_ok=True)
+         
+         # 读取调度配置
+@@ -244,7 +243,7 @@ class DIFF_GRMTrainer:
+         self.log(f'Training completed after {eval_count} evaluations (eval every {eval_interval} epochs)')
+         
+         # 🚀 修复：在训练结束前加载最佳模型权重
+-        if self.accelerator.is_main_process:
++        if self.accelerator.is_main_process and os.path.exists(self.saved_model_ckpt):
+             self.log(f'Loading best checkpoint ({self.saved_model_ckpt}) for final test')
+             state_dict = torch.load(self.saved_model_ckpt, map_location="cpu")
+             self.model.load_state_dict(state_dict)
+diff --git a/genrec/pipeline.py b/genrec/pipeline.py
+index 586a253..ba53633 100644
+--- a/genrec/pipeline.py
++++ b/genrec/pipeline.py
+@@ -8,6 +8,7 @@ from logging import getLogger
+ from typing import Union
+ import torch
+ import os
++import json
+ from accelerate import Accelerator
+ from torch.utils.data import DataLoader
+ 
+@@ -108,19 +109,27 @@ class Pipeline:
+ 
+         self.accelerator.wait_for_everyone()
+         self.model = self.accelerator.unwrap_model(self.model)
+-        if self.checkpoint_path is None:
++        if self.checkpoint_path is None and os.path.exists(self.trainer.saved_model_ckpt):
+             self.model.load_state_dict(torch.load(self.trainer.saved_model_ckpt))
+ 
+         self.model, test_dataloader = self.accelerator.prepare(
+             self.model, test_dataloader
+         )
+-        if self.accelerator.is_main_process and self.checkpoint_path is None:
++        if self.accelerator.is_main_process and self.checkpoint_path is None and os.path.exists(self.trainer.saved_model_ckpt):
+             self.log(f'Loaded best model checkpoint from {self.trainer.saved_model_ckpt}')
+ 
+         # Enable graph-constrained decoding for model inference
+         self.trainer.model.generate_w_decoding_graph = True
+         test_results = self.trainer.evaluate(test_dataloader)
+ 
++        # Export per-user predictions
++        if self.accelerator.is_main_process:
++            export_path = os.path.join(self.project_dir, 'pred_topk.jsonl')
++            if hasattr(self.trainer, "export_predictions"):
++                self.trainer.export_predictions(test_dataloader, export_path)
++            else:
++                self.log(f"[WARN] trainer has no export_predictions; skip export to {export_path}")
++
+         if self.accelerator.is_main_process:
+             for key in test_results:
+                 self.accelerator.log({f'Test_Metric/{key}': test_results[key]})
+diff --git a/genrec/trainer.py b/genrec/trainer.py
+index b77dac4..3136777 100644
+--- a/genrec/trainer.py
++++ b/genrec/trainer.py
+@@ -5,6 +5,7 @@
+ # LICENSE file in the root directory of this source tree.
+ 
+ import os
++import json
+ from tqdm import tqdm
+ import numpy as np
+ from collections import defaultdict, OrderedDict
+@@ -302,6 +303,75 @@ class Trainer:
+ 
+         return output_results, group2results
+ 
++
++    def export_predictions(self, dataloader, output_path, split='test'):
++        """Export per-user top-K item predictions to pred_topk.jsonl."""
++        self.model.eval()
++
++        # Build reverse token-to-item mapping
++        tokens2item_id = {}
++        for item, tokens in self.tokenizer.item2tokens.items():
++            item_id = self.tokenizer.item2id[item]
++            tokens2item_id[tokens] = item_id
++
++        all_user_preds = []
++        val_progress_bar = tqdm(
++            dataloader,
++            total=len(dataloader),
++            desc=f"Export preds - {split}",
++        )
++        for batch in val_progress_bar:
++            with torch.no_grad():
++                batch = {k: v.to(self.accelerator.device) for k, v in batch.items()}
++                if self.config['use_ddp']:
++                    preds = self.model.module.generate(batch, n_return_sequences=20)
++                else:
++                    preds = self.model.generate(batch, n_return_sequences=20)
++
++                if isinstance(preds, tuple):
++                    preds = preds[0]
++
++                preds_cpu = preds.detach().cpu()
++                labels_cpu = batch['labels'].detach().cpu()
++
++                for i in range(preds_cpu.shape[0]):
++                    # Decode each predicted token sequence to item ID
++                    decoded_items = []
++                    seen = set()
++                    for j in range(preds_cpu.shape[1]):
++                        pred_tokens = preds_cpu[i, j].tolist()
++                        # Remove eos token
++                        eos = self.tokenizer.eos_token
++                        if eos in pred_tokens:
++                            pred_tokens = pred_tokens[:pred_tokens.index(eos)]
++                        pred_key = tuple(pred_tokens)
++                        item_id = tokens2item_id.get(pred_key, None)
++                        if item_id is not None:
++                            # Convert from 1-based to SETRec 0-based
++                            item_0based = item_id - 1
++                            if item_0based >= 0 and item_0based not in seen:
++                                seen.add(item_0based)
++                                decoded_items.append(item_0based)
++
++                    # Get user's label token sequence to identify user
++                    label_tokens = labels_cpu[i].tolist()
++                    if eos in label_tokens:
++                        label_tokens = label_tokens[:label_tokens.index(eos)]
++                    gt_item_id = tokens2item_id.get(tuple(label_tokens), None)
++
++                    all_user_preds.append({
++                        'gt_item_id_1based': gt_item_id,
++                        'predicted_items': decoded_items[:20],
++                    })
++
++        # Save
++        os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else '.', exist_ok=True)
++        with open(output_path, 'w') as f:
++            for entry in all_user_preds:
++                f.write(json.dumps(entry) + '\n')
++        self.log(f'[EXPORT] Saved {len(all_user_preds)} predictions to {output_path}')
++        return all_user_preds
++
+     def end(self):
+         """
+         Ends the training process and releases any used resources

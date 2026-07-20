@@ -1,0 +1,43 @@
+diff --git a/genrec/datasets/__init__.py b/genrec/datasets/__init__.py
+index 3b93f1e..f9f2729 100644
+--- a/genrec/datasets/__init__.py
++++ b/genrec/datasets/__init__.py
+@@ -5,3 +5,5 @@
+ # LICENSE file in the root directory of this source tree.
+ 
+ from genrec.datasets.AmazonReviews2014.dataset import AmazonReviews2014
++
++from genrec.datasets.SETRec.dataset import SETRec
+diff --git a/genrec/models/DIFF_GRM/trainer.py b/genrec/models/DIFF_GRM/trainer.py
+index b7d70ef..caee95a 100644
+--- a/genrec/models/DIFF_GRM/trainer.py
++++ b/genrec/models/DIFF_GRM/trainer.py
+@@ -244,7 +244,7 @@ class DIFF_GRMTrainer:
+         self.log(f'Training completed after {eval_count} evaluations (eval every {eval_interval} epochs)')
+         
+         # 🚀 修复：在训练结束前加载最佳模型权重
+-        if self.accelerator.is_main_process:
++        if self.accelerator.is_main_process and os.path.exists(self.saved_model_ckpt):
+             self.log(f'Loading best checkpoint ({self.saved_model_ckpt}) for final test')
+             state_dict = torch.load(self.saved_model_ckpt, map_location="cpu")
+             self.model.load_state_dict(state_dict)
+diff --git a/genrec/pipeline.py b/genrec/pipeline.py
+index 586a253..b1df4cd 100644
+--- a/genrec/pipeline.py
++++ b/genrec/pipeline.py
+@@ -108,13 +108,13 @@ class Pipeline:
+ 
+         self.accelerator.wait_for_everyone()
+         self.model = self.accelerator.unwrap_model(self.model)
+-        if self.checkpoint_path is None:
++        if self.checkpoint_path is None and os.path.exists(self.trainer.saved_model_ckpt):
+             self.model.load_state_dict(torch.load(self.trainer.saved_model_ckpt))
+ 
+         self.model, test_dataloader = self.accelerator.prepare(
+             self.model, test_dataloader
+         )
+-        if self.accelerator.is_main_process and self.checkpoint_path is None:
++        if self.accelerator.is_main_process and self.checkpoint_path is None and os.path.exists(self.trainer.saved_model_ckpt):
+             self.log(f'Loaded best model checkpoint from {self.trainer.saved_model_ckpt}')
+ 
+         # Enable graph-constrained decoding for model inference

@@ -20,6 +20,10 @@ envs/
 /tmp/
 /checkpoints/
 /pred_exports/
+/archive/
+/third_party_clean/
+/third_party
+/papers/arxiv/
 *.pt
 *.pth
 *.ckpt
