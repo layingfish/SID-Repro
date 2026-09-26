@@ -1,6 +1,4 @@
-# Anonymous RecSys 2026 Submission
-
-This repository contains the code for reproducing the experiments in our RecSys 2026 submission.
+This repository contains the code for reproducing the experiments in our paper [**What Makes a Good Semantic ID for Generative Recommendation? A Reproducibility Study**](https://arxiv.org/abs/2609.24430).
 
 ## Environment
 
