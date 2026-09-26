@@ -96,19 +96,19 @@ Methods: `TIGER`, `T5-SemID`, `RPG`, `LETTER-TIGER`, `LETTER-LC-Rec`,
 Main hyperparameters:
 
 | Method | Native code path | Native SID and decoder setting |
-| --- | --- |
-| `TIGER` | `baselines/decoder` | RQ-VAE tokenizer followed by the reference TIGER decoder |
-| `T5-SemID` | `baselines/ref02` | HowToIndex/LLM-ID `semid` variant with its native P5/T5 decoder and `test_only_llm_id.py` export |
-| `RPG` | `baselines/ref04` | Faiss OPQ/PQ SID plus RPG graph propagation and generator |
-| `LETTER-TIGER` | `baselines/ref03/LETTER-TIGER` | LETTER RQ-VAE indices with the LETTER-TIGER decoder |
-| `LETTER-LC-Rec` | `baselines/ref03/LETTER-LC-Rec` | LETTER indices with the LC-Rec decoder |
-| `SETRec` | `baselines/reference/code` | SETRec T5 semantic/CF query-token decoder |
-| `ETEGRec` | `baselines/ref07` | End-to-end RQ-VAE recommender with `setrec_<dataset>.yaml` configs |
-| `SEATER` | `baselines/ref01` | Tree-structured SID and native SEATER generator |
-| `EAGER` | `baselines/ref08` | Two-stream behavior/semantic tree model via `train_rec_setrec.py` |
-| `DiffGRM` | `baselines/ref06` | OPQ/PQ SID with DiffGRM diffusion generator |
-| `SASRec` | `baselines/ref01/model/SASREC.py` | Sequential CF baseline |
-| `OneRec` | `baselines/ref05` | RQ-Kmeans-style OneRec pipeline |
+| --- | --- | --- |
+| TIGER | baselines/decoder | RQ-VAE tokenizer followed by the reference TIGER decoder |
+| T5-SemID | baselines/ref02 | HowToIndex/LLM-ID semid variant with its native P5/T5 decoder and test_only_llm_id.py export |
+| RPG | baselines/ref04 | Faiss OPQ/PQ SID plus RPG graph propagation and generator |
+| LETTER-TIGER | baselines/ref03/LETTER-TIGER | LETTER RQ-VAE indices with the LETTER-TIGER decoder |
+| LETTER-LC-Rec | baselines/ref03/LETTER-LC-Rec | LETTER indices with the LC-Rec decoder |
+| SETRec | baselines/reference/code | SETRec T5 semantic/CF query-token decoder |
+| ETEGRec | baselines/ref07 | End-to-end RQ-VAE recommender with setrec_<dataset>.yaml configs |
+| SEATER | baselines/ref01 | Tree-structured SID and native SEATER generator |
+| EAGER | baselines/ref08 | Two-stream behavior/semantic tree model via train_rec_setrec.py |
+| DiffGRM | baselines/ref06 | OPQ/PQ SID with DiffGRM diffusion generator |
+| SASRec | baselines/ref01/model/SASREC.py | Sequential CF baseline |
+| OneRec | baselines/ref05 | RQ-Kmeans-style OneRec pipeline |
 
 The submitted hyperparameters for these method-native runs are recorded in
 `configs/tokenizer/main_table_tokenizers.yaml`. A method-native run is launched
